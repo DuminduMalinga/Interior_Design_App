@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 part 'dashboard.dart';
 part 'upload.dart';
 part 'processing.dart';
+part 'room_selection.dart';
 
 void main() => runApp(const MyApp());
 
