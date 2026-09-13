@@ -1,8 +1,21 @@
 import 'package:flutter/material.dart';
 
+<<<<<<< Updated upstream
 void main() {
   runApp(const MyApp());
 }
+=======
+part 'dashboard.dart';
+part 'upload.dart';
+
+void main() => runApp(const MyApp());
+
+const _background = Color(0xFF080B14);
+const _surface = Color(0xFF111624);
+const _muted = Color(0xFF8991A6);
+const _blue = Color(0xFF4D9BFF);
+const _violet = Color(0xFF8A6BFF);
+>>>>>>> Stashed changes
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});

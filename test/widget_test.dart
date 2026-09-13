@@ -27,4 +27,19 @@ void main() {
     expect(find.text('0'), findsNothing);
     expect(find.text('1'), findsOneWidget);
   });
+
+  testWidgets('opens the floor plan upload screen', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MyApp());
+
+    await tester.tap(find.text('Upload'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Upload floor plan'), findsNWidgets(2));
+    expect(find.text('Upload your floor plan'), findsOneWidget);
+    expect(find.text('Accepted formats'), findsOneWidget);
+    expect(find.byIcon(Icons.camera_alt_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.photo_library_outlined), findsOneWidget);
+  });
 }
