@@ -80,7 +80,7 @@ class _UploadScreenState extends State<UploadScreen> {
                   ),
                   child: ElevatedButton.icon(
                     onPressed: _selected
-                        ? () => _showProcessingMessage(context)
+                        ? () => _openProcessing(context)
                         : () => setState(() => _selected = true),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
@@ -113,12 +113,10 @@ class _UploadScreenState extends State<UploadScreen> {
     );
   }
 
-  void _showProcessingMessage(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Your floor plan is ready for AI processing.'),
-      ),
-    );
+  void _openProcessing(BuildContext context) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const ProcessingScreen()));
   }
 }
 
@@ -346,6 +344,268 @@ class _DashedBorderPainter extends CustomPainter {
         distance += 13;
       }
     }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _LegacyProcessingScreen extends StatefulWidget {
+  const _LegacyProcessingScreen();
+
+  @override
+  State<_LegacyProcessingScreen> createState() => _ProcessingScreenState();
+}
+
+class _ProcessingScreenState extends State<_LegacyProcessingScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  Timer? _statusTimer;
+  int _statusIndex = 0;
+
+  static const _statuses = [
+    'Detecting rooms...',
+    'Mapping your floor plan...',
+    'Preparing your smart design...',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat();
+    _statusTimer = Timer(const Duration(milliseconds: 1500), _advanceStatus);
+  }
+
+  void _advanceStatus() {
+    if (!mounted) return;
+    setState(() => _statusIndex = (_statusIndex + 1) % _statuses.length);
+    _statusTimer = Timer(const Duration(milliseconds: 1800), _advanceStatus);
+  }
+
+  @override
+  void dispose() {
+    _statusTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Stack(
+          children: [
+            const _ProcessingBackground(),
+            Positioned(
+              top: 12,
+              left: 12,
+              child: IconButton(
+                onPressed: () => Navigator.of(context).maybePop(),
+                tooltip: 'Back',
+                icon: const Icon(Icons.close_rounded, color: _muted),
+              ),
+            ),
+            Center(
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) => Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 254,
+                      height: 254,
+                      child: CustomPaint(
+                        painter: _ProcessingRingPainter(
+                          progress: _controller.value,
+                        ),
+                        child: Center(
+                          child: Transform.scale(
+                            scale:
+                                1 +
+                                (_controller.value < .5
+                                        ? _controller.value
+                                        : 1 - _controller.value) *
+                                    .12,
+                            child: const _BlueprintMark(),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 34),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: Text(
+                        _statuses[_statusIndex],
+                        key: ValueKey(_statusIndex),
+                        style: const TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Our AI is analyzing every detail',
+                      style: TextStyle(color: _muted, fontSize: 12),
+                    ),
+                    const SizedBox(height: 26),
+                    SizedBox(
+                      width: 165,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: LinearProgressIndicator(
+                          minHeight: 4,
+                          value: null,
+                          backgroundColor: Colors.white10,
+                          valueColor: const AlwaysStoppedAnimation(_blue),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProcessingBackground extends StatelessWidget {
+  const _ProcessingBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: IgnorePointer(child: CustomPaint(painter: _ScanlinePainter())),
+    );
+  }
+}
+
+class _ProcessingRingPainter extends CustomPainter {
+  const _ProcessingRingPainter({required this.progress});
+
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final radius = size.width * .38;
+    final track = Paint()
+      ..color = Colors.white.withValues(alpha: .08)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 9;
+    canvas.drawCircle(center, radius, track);
+
+    final ring = Paint()
+      ..shader = const SweepGradient(
+        colors: [_blue, _violet, _blue],
+      ).createShader(Rect.fromCircle(center: center, radius: radius))
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 9;
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -math.pi / 2 + progress * math.pi * 2,
+      math.pi * 1.45,
+      false,
+      ring,
+    );
+
+    final glow = Paint()
+      ..color = _blue.withValues(alpha: .12)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22);
+    canvas.drawCircle(center, radius + 2, glow);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProcessingRingPainter oldDelegate) =>
+      oldDelegate.progress != progress;
+}
+
+class _BlueprintMark extends StatelessWidget {
+  const _BlueprintMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 104,
+      height: 104,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: _surface.withValues(alpha: .95),
+        border: Border.all(color: _blue.withValues(alpha: .22)),
+        boxShadow: [
+          BoxShadow(
+            color: _blue.withValues(alpha: .25),
+            blurRadius: 28,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: const CustomPaint(painter: _BlueprintPainter()),
+    );
+  }
+}
+
+class _BlueprintPainter extends CustomPainter {
+  const _BlueprintPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF93C5FF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    final rect = Rect.fromLTWH(27, 26, 50, 51);
+    canvas.drawRect(rect, paint);
+    canvas.drawLine(
+      Offset(rect.left, rect.top + 22),
+      Offset(rect.left + 22, rect.top + 22),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(rect.left + 22, rect.top + 22),
+      Offset(rect.left + 22, rect.bottom),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(rect.left + 22, rect.top),
+      Offset(rect.left + 22, rect.top + 13),
+      paint,
+    );
+    canvas.drawCircle(Offset(rect.right - 13, rect.bottom - 13), 6, paint);
+    canvas.drawCircle(Offset(rect.left + 12, rect.top + 11), 3, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _ScanlinePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = _blue.withValues(alpha: .035)
+      ..strokeWidth = 1;
+    for (var y = 0.0; y < size.height; y += 14) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+    final glow = Paint()
+      ..shader =
+          const RadialGradient(
+            colors: [Color(0x223E8BFF), Colors.transparent],
+          ).createShader(
+            Rect.fromCircle(
+              center: Offset(size.width / 2, size.height / 2),
+              radius: size.width * .8,
+            ),
+          );
+    canvas.drawRect(Offset.zero & size, glow);
   }
 
   @override
