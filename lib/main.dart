@@ -8,6 +8,7 @@ part 'upload.dart';
 part 'processing.dart';
 part 'room_selection.dart';
 part 'layouts.dart';
+part 'auth.dart';
 
 void main() => runApp(const MyApp());
 
@@ -34,7 +35,7 @@ class MyApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      home: const DashboardScreen(),
+      home: const AuthScreen(),
     );
   }
 }
