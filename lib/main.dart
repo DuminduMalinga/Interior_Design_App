@@ -7,6 +7,11 @@ part 'dashboard.dart';
 part 'upload.dart';
 part 'processing.dart';
 part 'room_selection.dart';
+<<<<<<< Updated upstream
+=======
+part 'layouts.dart';
+part 'room_viewer.dart';
+>>>>>>> Stashed changes
 
 void main() => runApp(const MyApp());
 
