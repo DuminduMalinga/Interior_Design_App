@@ -349,7 +349,6 @@ class _DashedBorderPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
 class _LegacyProcessingScreen extends StatefulWidget {
   const _LegacyProcessingScreen();
 
@@ -361,6 +360,7 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   Timer? _statusTimer;
+  Timer? _completeTimer;
   int _statusIndex = 0;
 
   static const _statuses = [
@@ -377,6 +377,10 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
       duration: const Duration(milliseconds: 2200),
     )..repeat();
     _statusTimer = Timer(const Duration(milliseconds: 1500), _advanceStatus);
+    _completeTimer = Timer(
+      const Duration(milliseconds: 5400),
+      _openRoomSelection,
+    );
   }
 
   void _advanceStatus() {
@@ -385,9 +389,17 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
     _statusTimer = Timer(const Duration(milliseconds: 1800), _advanceStatus);
   }
 
+  void _openRoomSelection() {
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const RoomSelectionScreen()),
+    );
+  }
+
   @override
   void dispose() {
     _statusTimer?.cancel();
+    _completeTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
