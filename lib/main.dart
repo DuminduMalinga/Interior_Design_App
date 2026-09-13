@@ -7,6 +7,7 @@ part 'dashboard.dart';
 part 'upload.dart';
 part 'processing.dart';
 part 'room_selection.dart';
+part 'layouts.dart';
 
 void main() => runApp(const MyApp());
 
