@@ -8,27 +8,26 @@ class UploadScreen extends StatefulWidget {
 }
 
 class _UploadScreenState extends State<UploadScreen> {
-  bool _hasSelection = false;
+  bool _selected = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: _background,
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).maybePop(),
-          tooltip: 'Back',
-          icon: const Icon(Icons.arrow_back_rounded),
-        ),
         title: const Text(
           'Upload floor plan',
           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
         ),
         centerTitle: true,
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).maybePop(),
+          tooltip: 'Back',
+          icon: const Icon(Icons.arrow_back_rounded),
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -48,10 +47,8 @@ class _UploadScreenState extends State<UploadScreen> {
               ),
               const SizedBox(height: 28),
               _UploadDropzone(
-                hasSelection: _hasSelection,
-                onTap: () => setState(() => _hasSelection = true),
-                onCameraTap: () => setState(() => _hasSelection = true),
-                onGalleryTap: () => setState(() => _hasSelection = true),
+                selected: _selected,
+                onSelect: () => setState(() => _selected = true),
               ),
               const SizedBox(height: 26),
               const Text(
@@ -64,7 +61,7 @@ class _UploadScreenState extends State<UploadScreen> {
                 style: TextStyle(color: _muted, fontSize: 11),
               ),
               const SizedBox(height: 13),
-              const _ExamplePlans(),
+              const _FloorPlanExamples(),
               const SizedBox(height: 28),
               SizedBox(
                 width: double.infinity,
@@ -82,9 +79,9 @@ class _UploadScreenState extends State<UploadScreen> {
                     ],
                   ),
                   child: ElevatedButton.icon(
-                    onPressed: _hasSelection
+                    onPressed: _selected
                         ? () => _openProcessing(context)
-                        : () => setState(() => _hasSelection = true),
+                        : () => setState(() => _selected = true),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
                       foregroundColor: Colors.white,
@@ -94,13 +91,13 @@ class _UploadScreenState extends State<UploadScreen> {
                       ),
                     ),
                     icon: Icon(
-                      _hasSelection
+                      _selected
                           ? Icons.auto_awesome_rounded
                           : Icons.cloud_upload_outlined,
                       size: 20,
                     ),
                     label: Text(
-                      _hasSelection ? 'Generate with AI' : 'Upload floor plan',
+                      _selected ? 'Generate with AI' : 'Upload floor plan',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
@@ -124,24 +121,17 @@ class _UploadScreenState extends State<UploadScreen> {
 }
 
 class _UploadDropzone extends StatelessWidget {
-  const _UploadDropzone({
-    required this.hasSelection,
-    required this.onTap,
-    required this.onCameraTap,
-    required this.onGalleryTap,
-  });
+  const _UploadDropzone({required this.selected, required this.onSelect});
 
-  final bool hasSelection;
-  final VoidCallback onTap;
-  final VoidCallback onCameraTap;
-  final VoidCallback onGalleryTap;
+  final bool selected;
+  final VoidCallback onSelect;
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
       painter: _DashedBorderPainter(),
       child: InkWell(
-        onTap: onTap,
+        onTap: onSelect,
         borderRadius: BorderRadius.circular(24),
         child: Container(
           height: 268,
@@ -175,16 +165,14 @@ class _UploadDropzone extends StatelessWidget {
                   border: Border.all(color: _blue.withValues(alpha: .35)),
                 ),
                 child: Icon(
-                  hasSelection
-                      ? Icons.check_rounded
-                      : Icons.cloud_upload_outlined,
+                  selected ? Icons.check_rounded : Icons.cloud_upload_outlined,
                   color: const Color(0xFFB9D5FF),
                   size: 31,
                 ),
               ),
               const SizedBox(height: 16),
               Text(
-                hasSelection ? 'Floor plan selected' : 'Upload your floor plan',
+                selected ? 'Floor plan selected' : 'Upload your floor plan',
                 style: const TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
@@ -192,7 +180,7 @@ class _UploadDropzone extends StatelessWidget {
               ),
               const SizedBox(height: 7),
               Text(
-                hasSelection
+                selected
                     ? 'Tap below to generate your AI design'
                     : 'Drag and drop or choose an image to begin',
                 textAlign: TextAlign.center,
@@ -202,16 +190,16 @@ class _UploadDropzone extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _UploadOption(
+                  _UploadAction(
                     icon: Icons.camera_alt_outlined,
                     label: 'Camera',
-                    onTap: onCameraTap,
+                    onTap: onSelect,
                   ),
                   const SizedBox(width: 10),
-                  _UploadOption(
+                  _UploadAction(
                     icon: Icons.photo_library_outlined,
                     label: 'Gallery',
-                    onTap: onGalleryTap,
+                    onTap: onSelect,
                   ),
                 ],
               ),
@@ -223,8 +211,8 @@ class _UploadDropzone extends StatelessWidget {
   }
 }
 
-class _UploadOption extends StatelessWidget {
-  const _UploadOption({
+class _UploadAction extends StatelessWidget {
+  const _UploadAction({
     required this.icon,
     required this.label,
     required this.onTap,
@@ -238,90 +226,74 @@ class _UploadOption extends StatelessWidget {
   Widget build(BuildContext context) {
     return OutlinedButton.icon(
       onPressed: onTap,
+      icon: Icon(icon, size: 16),
+      label: Text(label, style: const TextStyle(fontSize: 11)),
       style: OutlinedButton.styleFrom(
         foregroundColor: const Color(0xFFD5E4FF),
-        side: BorderSide(color: Colors.white.withValues(alpha: .13)),
         backgroundColor: Colors.white.withValues(alpha: .04),
+        side: BorderSide(color: Colors.white.withValues(alpha: .13)),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
-      icon: Icon(icon, size: 16),
-      label: Text(label, style: const TextStyle(fontSize: 11)),
     );
   }
 }
 
-class _ExamplePlans extends StatelessWidget {
-  const _ExamplePlans();
-
-  static const examples = [
-    Color(0xFF4D9BFF),
-    Color(0xFF35C5B5),
-    Color(0xFF8A6BFF),
-  ];
+class _FloorPlanExamples extends StatelessWidget {
+  const _FloorPlanExamples();
 
   @override
   Widget build(BuildContext context) {
+    const accents = [_blue, Color(0xFF35C5B5), _violet];
     return Row(
       children: [
-        for (var i = 0; i < examples.length; i++) ...[
+        for (var i = 0; i < accents.length; i++) ...[
           Expanded(
-            child: _ExampleThumbnail(accent: examples[i], variant: i),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: AspectRatio(
+                aspectRatio: 1.15,
+                child: ColoredBox(
+                  color: const Color(0xFF17202D),
+                  child: CustomPaint(
+                    painter: _ExamplePlanPainter(
+                      accent: accents[i],
+                      variant: i,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
-          if (i != examples.length - 1) const SizedBox(width: 10),
+          if (i < accents.length - 1) const SizedBox(width: 10),
         ],
       ],
     );
   }
 }
 
-class _ExampleThumbnail extends StatelessWidget {
-  const _ExampleThumbnail({required this.accent, required this.variant});
-
-  final Color accent;
-  final int variant;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: AspectRatio(
-        aspectRatio: 1.15,
-        child: ColoredBox(
-          color: const Color(0xFF17202D),
-          child: CustomPaint(
-            painter: _ExampleFloorPlanPainter(accent: accent, variant: variant),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ExampleFloorPlanPainter extends CustomPainter {
-  const _ExampleFloorPlanPainter({required this.accent, required this.variant});
+class _ExamplePlanPainter extends CustomPainter {
+  const _ExamplePlanPainter({required this.accent, required this.variant});
 
   final Color accent;
   final int variant;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paper = Paint()..color = const Color(0xFFE9EDF3);
+    final sheet = Rect.fromLTWH(11, 9, size.width - 22, size.height - 18);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(sheet, const Radius.circular(4)),
+      Paint()..color = const Color(0xFFE9EDF3),
+    );
     final wall = Paint()
       ..color = const Color(0xFF344253)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
-    final accentPaint = Paint()
+    final detail = Paint()
       ..color = accent.withValues(alpha: .85)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.4;
-    final roomFill = Paint()..color = accent.withValues(alpha: .12);
-    final sheet = Rect.fromLTWH(11, 9, size.width - 22, size.height - 18);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(sheet, const Radius.circular(4)),
-      paper,
-    );
-
+    final fill = Paint()..color = accent.withValues(alpha: .12);
     final rooms = variant == 0
         ? [
             Rect.fromLTWH(sheet.left + 8, sheet.top + 8, 42, 35),
@@ -340,48 +312,30 @@ class _ExampleFloorPlanPainter extends CustomPainter {
             Rect.fromLTWH(sheet.left + 8, sheet.top + 40, 39, 49),
             Rect.fromLTWH(sheet.left + 51, sheet.top + 40, 38, 49),
           ];
-
     for (var i = 0; i < rooms.length; i++) {
-      canvas.drawRect(rooms[i], i == variant ? roomFill : wall);
+      canvas.drawRect(rooms[i], i == variant ? fill : wall);
       if (i == 0) {
-        canvas.drawCircle(rooms[i].center, 5, accentPaint);
+        canvas.drawCircle(rooms[i].center, 5, detail);
       }
     }
-
-    final door = Path()
-      ..moveTo(rooms[0].right - 10, rooms[0].bottom)
-      ..quadraticBezierTo(
-        rooms[0].right - 10,
-        rooms[0].bottom - 10,
-        rooms[0].right,
-        rooms[0].bottom - 10,
-      );
-    canvas.drawPath(door, accentPaint);
-    canvas.drawLine(
-      Offset(sheet.left + 8, sheet.bottom - 5),
-      Offset(sheet.right - 8, sheet.bottom - 5),
-      Paint()
-        ..color = const Color(0xFF9AA7B8)
-        ..strokeWidth = 1,
-    );
   }
 
   @override
-  bool shouldRepaint(covariant _ExampleFloorPlanPainter oldDelegate) =>
+  bool shouldRepaint(covariant _ExamplePlanPainter oldDelegate) =>
       oldDelegate.accent != accent || oldDelegate.variant != variant;
 }
 
 class _DashedBorderPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = _blue.withValues(alpha: .65)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
     final path = Path()
       ..addRRect(
         RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(24)),
       );
+    final paint = Paint()
+      ..color = _blue.withValues(alpha: .65)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
     for (final metric in path.computeMetrics()) {
       var distance = 0.0;
       while (distance < metric.length) {
