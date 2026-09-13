@@ -37,67 +37,62 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           const Positioned.fill(child: _WelcomeBackground()),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(26, 18, 26, 24),
+              padding: const EdgeInsets.fromLTRB(22, 14, 22, 22),
               child: Column(
                 children: [
+                  _WelcomeTopBar(onSignIn: () => _openAuth(context, true)),
+                  const SizedBox(height: 18),
                   Expanded(
                     child: SingleChildScrollView(
                       child: Column(
                         children: [
-                          const _AiPill(),
+                          const _StatusPill(),
+                          const SizedBox(height: 18),
+                          const _Headline(),
+                          const SizedBox(height: 11),
+                          const Text(
+                            'AI-powered room detection turns 2D architectural '
+                            'blueprints into photorealistic, interactive 3D '
+                            'environments in seconds.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: _muted,
+                              fontSize: 12.5,
+                              height: 1.5,
+                            ),
+                          ),
                           const SizedBox(height: 22),
                           AnimatedBuilder(
                             animation: _floatController,
                             builder: (context, child) {
                               final dy =
                                   math.sin(_floatController.value * math.pi) *
-                                  7;
+                                  6;
                               return Transform.translate(
                                 offset: Offset(0, -dy),
                                 child: child,
                               );
                             },
-                            child: const _WelcomeHero(),
+                            child: _HeroCard(pulse: _floatController),
                           ),
-                          const SizedBox(height: 30),
-                          const Text(
-                            'Transform Floor Plans into\nStunning 3D Spaces',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 27,
-                              height: 1.16,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -.6,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'Our AI detects every room in your floor plan and '
-                            'turns it into a fully furnished, photoreal 3D '
-                            'design in seconds.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: _muted,
-                              fontSize: 13,
-                              height: 1.5,
-                            ),
-                          ),
-                          const SizedBox(height: 26),
+                          const SizedBox(height: 20),
                           const Row(
                             children: [
                               Expanded(
                                 child: _StatTile(
-                                  icon: Icons.track_changes_rounded,
+                                  icon: Icons.check_circle_outline_rounded,
                                   value: '98%',
-                                  label: 'Accuracy',
+                                  label: 'Boundary Accuracy',
+                                  accent: _blue,
                                 ),
                               ),
                               SizedBox(width: 12),
                               Expanded(
                                 child: _StatTile(
                                   icon: Icons.bolt_rounded,
-                                  value: '15 sec',
-                                  label: 'Avg. render time',
+                                  value: '15s',
+                                  label: 'AI 3D Synthesis',
+                                  accent: _violet,
                                 ),
                               ),
                             ],
@@ -106,7 +101,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       ),
                     ),
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
                     height: 56,
@@ -126,7 +121,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         ],
                       ),
                       child: ElevatedButton(
-                        onPressed: () => _getStarted(context),
+                        onPressed: () => _openAuth(context, false),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
                           foregroundColor: Colors.white,
@@ -152,6 +147,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       ),
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'No credit card required • Instant 3D CAD analysis',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: _muted, fontSize: 10.5),
+                  ),
                 ],
               ),
             ),
@@ -161,9 +162,160 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     );
   }
 
-  void _getStarted(BuildContext context) {
+  void _openAuth(BuildContext context, bool signIn) {
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const AuthScreen()),
+      MaterialPageRoute<void>(
+        builder: (_) => AuthScreen(startInSignIn: signIn),
+      ),
+    );
+  }
+}
+
+/// Brand mark + wordmark on the left, a "Sign In" shortcut on the right.
+class _WelcomeTopBar extends StatelessWidget {
+  const _WelcomeTopBar({required this.onSignIn});
+
+  final VoidCallback onSignIn;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [_blue, _violet],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 18),
+        ),
+        const SizedBox(width: 9),
+        const Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: 'Planly ',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+              ),
+              TextSpan(
+                text: 'AI',
+                style: TextStyle(
+                  color: _blue,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 7),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: _violet.withValues(alpha: .16),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: _violet.withValues(alpha: .4)),
+          ),
+          child: const Text(
+            'AI 3D',
+            style: TextStyle(
+              color: Color(0xFFC9B8FF),
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const Spacer(),
+        TextButton(
+          onPressed: onSignIn,
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.white,
+            padding: EdgeInsets.zero,
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: const Text(
+            'Sign In',
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: _blue.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _blue.withValues(alpha: .32)),
+      ),
+      child: const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.hub_rounded, color: Color(0xFF83B9FF), size: 13),
+            SizedBox(width: 6),
+            Text(
+              'Next-Gen Spatial Intelligence',
+              style: TextStyle(
+                color: Color(0xFFB9D5FF),
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Headline extends StatelessWidget {
+  const _Headline();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const Text(
+          'Transform Floor Plans into',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 25,
+            height: 1.18,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -.5,
+          ),
+        ),
+        ShaderMask(
+          shaderCallback: (bounds) => const LinearGradient(
+            colors: [_blue, _violet],
+          ).createShader(bounds),
+          child: const Text(
+            'Stunning 3D Spaces',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 25,
+              height: 1.18,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -.5,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -173,34 +325,55 @@ class _StatTile extends StatelessWidget {
     required this.icon,
     required this.value,
     required this.label,
+    required this.accent,
   });
 
   final IconData icon;
   final String value;
   final String label;
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: _surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: .08)),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accent.withValues(alpha: .22)),
       ),
-      child: Column(
+      child: Row(
         children: [
-          Icon(icon, color: _blue, size: 20),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: .16),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: accent, size: 17),
           ),
-          const SizedBox(height: 3),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: _muted, fontSize: 10.5),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: _muted, fontSize: 9.5),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -208,15 +381,156 @@ class _StatTile extends StatelessWidget {
   }
 }
 
-/// Isometric 3D room illustration used as the welcome screen's hero visual.
-class _WelcomeHero extends StatelessWidget {
-  const _WelcomeHero();
+/// Bordered panel framing the isometric hero illustration, with floating
+/// status badges pinned to its edges — the focal element of the screen.
+class _HeroCard extends StatelessWidget {
+  const _HeroCard({required this.pulse});
+
+  final Animation<double> pulse;
 
   @override
   Widget build(BuildContext context) {
     return AspectRatio(
-      aspectRatio: 1.25,
-      child: CustomPaint(painter: _WelcomeHeroPainter(), size: Size.infinite),
+      aspectRatio: 1.12,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0C1220),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: _blue.withValues(alpha: .22)),
+                boxShadow: [
+                  BoxShadow(
+                    color: _blue.withValues(alpha: .12),
+                    blurRadius: 40,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _WelcomeHeroPainter(),
+                      size: Size.infinite,
+                    ),
+                  ),
+                  AnimatedBuilder(
+                    animation: pulse,
+                    builder: (context, child) {
+                      final t = (math.sin(pulse.value * math.pi * 2) + 1) / 2;
+                      return Positioned(
+                        left: 26,
+                        top: 40,
+                        child: _PulseDot(intensity: t),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: 8,
+            left: 8,
+            child: _HeroBadge(
+              icon: Icons.grid_3x3_rounded,
+              label: '3D Mesh: Detected',
+              color: const Color(0xFF4ADE80),
+            ),
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: _HeroBadge(
+              icon: Icons.speed_rounded,
+              label: '60 FPS ISOMETRIC',
+              color: _violet,
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: -14,
+            child: Center(
+              child: _HeroBadge(
+                icon: Icons.memory_rounded,
+                label: 'Neural Spatial Engine',
+                color: _blue,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PulseDot extends StatelessWidget {
+  const _PulseDot({required this.intensity});
+
+  final double intensity;
+
+  @override
+  Widget build(BuildContext context) {
+    const color = Color(0xFF4ADE80);
+    return Container(
+      width: 9,
+      height: 9,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: .35 + intensity * .35),
+            blurRadius: 6 + intensity * 8,
+            spreadRadius: 1 + intensity * 2,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroBadge extends StatelessWidget {
+  const _HeroBadge({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xE60D111D),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: .5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 11),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 8.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: .2,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
