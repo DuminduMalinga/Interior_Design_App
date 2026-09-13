@@ -163,7 +163,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   void _getStarted(BuildContext context) {
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const DashboardScreen()),
+      MaterialPageRoute<void>(builder: (_) => const AuthScreen()),
     );
   }
 }
