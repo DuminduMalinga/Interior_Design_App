@@ -28,4 +28,13 @@ void main() {
     expect(find.byIcon(Icons.camera_alt_outlined), findsOneWidget);
     expect(find.byIcon(Icons.photo_library_outlined), findsOneWidget);
   });
+
+  testWidgets('renders the AI processing screen', (WidgetTester tester) async {
+    await tester.pumpWidget(const MaterialApp(home: ProcessingScreen()));
+    await tester.pump();
+
+    expect(find.text('Detecting rooms...'), findsOneWidget);
+    expect(find.byType(ProcessingScreen), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
 }

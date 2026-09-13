@@ -80,7 +80,7 @@ class _UploadScreenState extends State<UploadScreen> {
                   ),
                   child: ElevatedButton.icon(
                     onPressed: _selected
-                        ? () => _showProcessingMessage(context)
+                        ? () => _openProcessing(context)
                         : () => setState(() => _selected = true),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
@@ -113,12 +113,10 @@ class _UploadScreenState extends State<UploadScreen> {
     );
   }
 
-  void _showProcessingMessage(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Your floor plan is ready for AI processing.'),
-      ),
-    );
+  void _openProcessing(BuildContext context) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const ProcessingScreen()));
   }
 }
 
@@ -351,9 +349,6 @@ class _DashedBorderPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-<<<<<<< Updated upstream
-=======
-
 class _LegacyProcessingScreen extends StatefulWidget {
   const _LegacyProcessingScreen();
 
@@ -628,4 +623,3 @@ class _ScanlinePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
->>>>>>> Stashed changes
