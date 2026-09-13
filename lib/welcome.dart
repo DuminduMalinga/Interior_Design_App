@@ -1,5 +1,8 @@
 part of 'main.dart';
 
+/// Cool cyan-blue used across the hero illustration's status badges.
+const _heroCyan = Color(0xFF5EC8F2);
+
 /// The app's landing screen — first thing a new user sees before signing up
 /// or jumping into the dashboard.
 class WelcomeScreen extends StatefulWidget {
@@ -433,33 +436,33 @@ class _HeroCard extends StatelessWidget {
               ),
             ),
           ),
-          Positioned(
+          const Positioned(
             top: 8,
             left: 8,
             child: _HeroBadge(
-              icon: Icons.grid_3x3_rounded,
+              icon: Icons.diamond_outlined,
               label: '3D Mesh: Detected',
-              color: const Color(0xFF4ADE80),
+              color: _heroCyan,
             ),
           ),
-          Positioned(
+          const Positioned(
             top: 8,
             right: 8,
             child: _HeroBadge(
-              icon: Icons.speed_rounded,
+              icon: Icons.auto_awesome_rounded,
               label: '60 FPS ISOMETRIC',
-              color: _violet,
+              color: _heroCyan,
             ),
           ),
-          Positioned(
+          const Positioned(
             left: 0,
             right: 0,
             bottom: -14,
             child: Center(
               child: _HeroBadge(
-                icon: Icons.memory_rounded,
+                icon: Icons.layers_outlined,
                 label: 'Neural Spatial Engine',
-                color: _blue,
+                color: _heroCyan,
               ),
             ),
           ),
@@ -625,6 +628,41 @@ class _WelcomeHeroPainter extends CustomPainter {
       _project(0, 0, h, size),
     ], wallPaint);
 
+    // A slim screen panel leaning against the right-back wall.
+    final screenPts = [
+      _project(120, 0, 46, size),
+      _project(168, 0, 46, size),
+      _project(168, 0, 96, size),
+      _project(120, 0, 96, size),
+    ];
+    final screenBounds = Rect.fromPoints(
+      screenPts.reduce(
+        (a, b) => Offset(math.min(a.dx, b.dx), math.min(a.dy, b.dy)),
+      ),
+      screenPts.reduce(
+        (a, b) => Offset(math.max(a.dx, b.dx), math.max(a.dy, b.dy)),
+      ),
+    );
+    _quad(
+      canvas,
+      screenPts,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [_blue, _violet],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ).createShader(screenBounds)
+        ..style = PaintingStyle.fill,
+    );
+    _quad(
+      canvas,
+      screenPts,
+      Paint()
+        ..color = _heroCyan.withValues(alpha: .6)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2,
+    );
+
     final rug = [
       _project(w * .16, d * .16, .3, size),
       _project(w * .84, d * .16, .3, size),
@@ -633,9 +671,68 @@ class _WelcomeHeroPainter extends CustomPainter {
     ];
     _quad(canvas, rug, Paint()..color = _violet.withValues(alpha: .10));
 
+    _drawScanRing(canvas, size, 55, 42, 42);
+
     _box(canvas, size, 18, 22, 92, 62, 34, _blue);
     _box(canvas, size, 118, 28, 178, 96, 46, _violet);
     _box(canvas, size, 28, 128, 100, 176, 26, const Color(0xFF35C5B5));
+
+    _drawFloorLamp(canvas, size, 172, 148);
+  }
+
+  /// A dashed circular "AI scan" ring on the floor beneath a piece of
+  /// furniture, echoing the radar-style detail in the reference art.
+  void _drawScanRing(
+    Canvas canvas,
+    Size size,
+    double cx,
+    double cy,
+    double radius,
+  ) {
+    final paint = Paint()
+      ..color = _heroCyan.withValues(alpha: .5)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.1;
+    const segments = 48;
+    Offset? previous;
+    for (var i = 0; i <= segments; i++) {
+      final angle = (i / segments) * math.pi * 2;
+      final point = _project(
+        cx + math.cos(angle) * radius,
+        cy + math.sin(angle) * radius,
+        .5,
+        size,
+      );
+      if (previous != null && i.isEven) {
+        canvas.drawLine(previous, point, paint);
+      }
+      previous = point;
+    }
+  }
+
+  /// A slim arched floor lamp, drawn directly in projected space.
+  void _drawFloorLamp(Canvas canvas, Size size, double x, double y) {
+    final base = _project(x, y, 0, size);
+    final bulb = _project(x - 26, y - 8, 68, size);
+    final control = _project(x - 4, y - 4, 62, size);
+    final stem = Paint()
+      ..color = Colors.white.withValues(alpha: .5)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+    canvas.drawPath(
+      Path()
+        ..moveTo(base.dx, base.dy)
+        ..quadraticBezierTo(control.dx, control.dy, bulb.dx, bulb.dy),
+      stem,
+    );
+    canvas.drawCircle(
+      bulb,
+      6,
+      Paint()
+        ..color = Colors.white.withValues(alpha: .18)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+    );
+    canvas.drawCircle(bulb, 3, Paint()..color = Colors.white);
   }
 
   @override
