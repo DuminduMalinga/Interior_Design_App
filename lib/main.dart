@@ -8,6 +8,7 @@ part 'upload.dart';
 part 'processing.dart';
 part 'room_selection.dart';
 part 'layouts.dart';
+part 'admin_accounts.dart';
 part 'auth.dart';
 
 void main() => runApp(const MyApp());
