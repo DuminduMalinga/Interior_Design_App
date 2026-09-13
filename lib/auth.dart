@@ -3,7 +3,10 @@ part of 'main.dart';
 /// Combined sign up / sign in screen. A single form toggles between the two
 /// modes so the layout, validation, and social button stay in one place.
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key});
+  const AuthScreen({this.startInSignIn = false, super.key});
+
+  /// Opens the form in sign-in mode instead of the default sign-up mode.
+  final bool startInSignIn;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -14,7 +17,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  bool _isSignUp = true;
+  late bool _isSignUp = !widget.startInSignIn;
   bool _obscurePassword = true;
   bool _submitting = false;
 
@@ -35,7 +38,10 @@ class _AuthScreenState extends State<AuthScreen> {
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 24),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 26,
+                  vertical: 24,
+                ),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 380),
                   child: Form(
@@ -109,7 +115,8 @@ class _AuthScreenState extends State<AuthScreen> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () => _notify(context, 'Password reset'),
+                              onPressed: () =>
+                                  _notify(context, 'Password reset'),
                               style: TextButton.styleFrom(
                                 foregroundColor: _blue,
                                 padding: EdgeInsets.zero,
@@ -180,8 +187,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           width: double.infinity,
                           height: 52,
                           child: OutlinedButton.icon(
-                            onPressed: () =>
-                                _notify(context, 'Google sign-in'),
+                            onPressed: () => _notify(context, 'Google sign-in'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.white,
                               backgroundColor: Colors.white.withValues(
@@ -424,9 +430,7 @@ class _OrDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(
-          child: Divider(color: Colors.white.withValues(alpha: .10)),
-        ),
+        Expanded(child: Divider(color: Colors.white.withValues(alpha: .10))),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 10),
           child: Text(
@@ -434,9 +438,7 @@ class _OrDivider extends StatelessWidget {
             style: TextStyle(color: _muted, fontSize: 10.5),
           ),
         ),
-        Expanded(
-          child: Divider(color: Colors.white.withValues(alpha: .10)),
-        ),
+        Expanded(child: Divider(color: Colors.white.withValues(alpha: .10))),
       ],
     );
   }
