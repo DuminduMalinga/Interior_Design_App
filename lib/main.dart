@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 part 'dashboard.dart';
+part 'upload.dart';
 
 void main() => runApp(const MyApp());
 

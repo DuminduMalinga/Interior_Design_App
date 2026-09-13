@@ -42,7 +42,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               bottom: 86,
               child: FloatingActionButton(
                 heroTag: 'new-upload',
-                onPressed: () {},
+                onPressed: () => _openUpload(context),
                 tooltip: 'New upload',
                 backgroundColor: _blue,
                 foregroundColor: Colors.white,
@@ -55,8 +55,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       bottomNavigationBar: _BottomNav(
         selectedIndex: _selectedTab,
-        onSelected: (index) => setState(() => _selectedTab = index),
+        onSelected: (index) {
+          if (index == 2) {
+            _openUpload(context);
+          } else {
+            setState(() => _selectedTab = index);
+          }
+        },
       ),
+    );
+  }
+
+  void _openUpload(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const UploadScreen()),
     );
   }
 }
