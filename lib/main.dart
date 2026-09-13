@@ -9,6 +9,7 @@ part 'processing.dart';
 part 'room_selection.dart';
 part 'layouts.dart';
 part 'admin_accounts.dart';
+part 'welcome.dart';
 
 void main() => runApp(const MyApp());
 
@@ -35,7 +36,7 @@ class MyApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      home: const DashboardScreen(),
+      home: const WelcomeScreen(),
     );
   }
 }
