@@ -274,11 +274,9 @@ class _LayoutCard extends StatelessWidget {
   }
 
   void _view3D(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: _surface,
-        behavior: SnackBarBehavior.floating,
-        content: Text('3D view for "${layout.title}" coming soon.'),
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Room3DViewerScreen(room: room, layout: layout),
       ),
     );
   }
