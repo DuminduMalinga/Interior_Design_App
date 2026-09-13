@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 
 part 'dashboard.dart';
 part 'upload.dart';
+<<<<<<< Updated upstream
+=======
+part 'processing.dart';
+part 'room_selection.dart';
+>>>>>>> Stashed changes
 
 void main() => runApp(const MyApp());
 
