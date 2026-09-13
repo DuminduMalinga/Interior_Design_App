@@ -21,7 +21,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _Header(onNotificationTap: () {}),
+                  _Header(
+                    onNotificationTap: () {},
+                    onAdminTap: () => _openAdmin(context),
+                  ),
                   const SizedBox(height: 28),
                   const _HeroBanner(),
                   const SizedBox(height: 28),
@@ -71,12 +74,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
       MaterialPageRoute<void>(builder: (_) => const UploadScreen()),
     );
   }
+
+  void _openAdmin(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const AdminAccountsScreen()),
+    );
+  }
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.onNotificationTap});
+  const _Header({required this.onNotificationTap, required this.onAdminTap});
 
   final VoidCallback onNotificationTap;
+  final VoidCallback onAdminTap;
 
   @override
   Widget build(BuildContext context) {
@@ -121,6 +131,19 @@ class _Header extends StatelessWidget {
           ],
         ),
         const Spacer(),
+        IconButton(
+          onPressed: onAdminTap,
+          tooltip: 'Manage accounts',
+          style: IconButton.styleFrom(
+            backgroundColor: _surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(color: Colors.white10),
+            ),
+          ),
+          icon: const Icon(Icons.admin_panel_settings_outlined, size: 20),
+        ),
+        const SizedBox(width: 10),
         IconButton(
           onPressed: onNotificationTap,
           tooltip: 'Notifications',
