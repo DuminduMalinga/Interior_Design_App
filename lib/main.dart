@@ -1,7 +1,11 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 part 'dashboard.dart';
 part 'upload.dart';
+part 'processing.dart';
 
 void main() => runApp(const MyApp());
 
