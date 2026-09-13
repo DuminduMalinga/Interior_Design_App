@@ -147,7 +147,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                     ],
                   ),
                   child: ElevatedButton.icon(
-                    onPressed: () => _confirmSelection(context, room),
+                    onPressed: () => _openLayouts(context, room),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
                       foregroundColor: Colors.white,
@@ -174,13 +174,9 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     );
   }
 
-  void _confirmSelection(BuildContext context, _DetectedRoom room) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: _surface,
-        behavior: SnackBarBehavior.floating,
-        content: Text('${room.name} selected — style picker coming soon.'),
-      ),
+  void _openLayouts(BuildContext context, _DetectedRoom room) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => LayoutsScreen(room: room)),
     );
   }
 }
