@@ -24,6 +24,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _Header(
                     onNotificationTap: () {},
                     onAdminTap: () => _openAdmin(context),
+                    onAvatarTap: () => _openProfile(context),
                   ),
                   const SizedBox(height: 28),
                   const _HeroBanner(),
@@ -61,6 +62,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         onSelected: (index) {
           if (index == 2) {
             _openUpload(context);
+          } else if (index == 3) {
+            _openProfile(context);
           } else {
             setState(() => _selectedTab = index);
           }
@@ -70,9 +73,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _openUpload(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const UploadScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const UploadScreen()));
   }
 
   void _openAdmin(BuildContext context) {
@@ -80,34 +83,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
       MaterialPageRoute<void>(builder: (_) => const AdminAccountsScreen()),
     );
   }
+
+  void _openProfile(BuildContext context) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const ProfileScreen()));
+  }
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.onNotificationTap, required this.onAdminTap});
+  const _Header({
+    required this.onNotificationTap,
+    required this.onAdminTap,
+    required this.onAvatarTap,
+  });
 
   final VoidCallback onNotificationTap;
   final VoidCallback onAdminTap;
+  final VoidCallback onAvatarTap;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              colors: [_violet, _blue],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+        InkWell(
+          onTap: onAvatarTap,
+          borderRadius: BorderRadius.circular(22),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [_violet, _blue],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              border: Border.all(color: Colors.white24, width: 2),
             ),
-            border: Border.all(color: Colors.white24, width: 2),
-          ),
-          child: const Center(
-            child: Text(
-              'JM',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+            child: const Center(
+              child: Text(
+                'JM',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+              ),
             ),
           ),
         ),
