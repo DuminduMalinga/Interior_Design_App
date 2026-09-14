@@ -11,6 +11,7 @@ part 'layouts.dart';
 part 'admin_accounts.dart';
 part 'auth.dart';
 part 'welcome.dart';
+part 'profile.dart';
 part 'room_viewer.dart';
 
 void main() => runApp(const MyApp());
