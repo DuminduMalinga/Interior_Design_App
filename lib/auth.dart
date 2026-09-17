@@ -11,17 +11,24 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _fullNameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   bool _isSignUp = true;
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   bool _submitting = false;
 
   @override
   void dispose() {
+    _fullNameController.dispose();
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -65,6 +72,46 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                         ),
                         const SizedBox(height: 30),
+                        if (_isSignUp) ...[
+                          _AuthField(
+                            controller: _fullNameController,
+                            hint: 'Full name',
+                            icon: Icons.badge_outlined,
+                            keyboardType: TextInputType.name,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Enter your full name';
+                              }
+                              if (v.trim().length < 2) {
+                                return 'Name is too short';
+                              }
+                              if (!RegExp(r"^[a-zA-Z\s'-]+$").hasMatch(v.trim())) {
+                                return 'Only letters, spaces, - and \' allowed';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 14),
+                          _AuthField(
+                            controller: _usernameController,
+                            hint: 'Username',
+                            icon: Icons.alternate_email_rounded,
+                            keyboardType: TextInputType.text,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Enter a username';
+                              }
+                              if (v.trim().length < 3) {
+                                return 'At least 3 characters';
+                              }
+                              if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(v.trim())) {
+                                return 'Letters, numbers, _ only';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 14),
+                        ],
                         _AuthField(
                           controller: _emailController,
                           hint: 'Email address',
@@ -74,7 +121,10 @@ class _AuthScreenState extends State<AuthScreen> {
                             if (v == null || v.trim().isEmpty) {
                               return 'Enter your email';
                             }
-                            if (!v.contains('@')) return 'Enter a valid email';
+                            if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                                .hasMatch(v.trim())) {
+                              return 'Enter a valid email';
+                            }
                             return null;
                           },
                         ),
@@ -101,9 +151,45 @@ class _AuthScreenState extends State<AuthScreen> {
                               return 'Enter your password';
                             }
                             if (v.length < 6) return 'At least 6 characters';
+                            if (_isSignUp &&
+                                !RegExp(r'^(?=.*[A-Za-z])(?=.*\d).+$')
+                                    .hasMatch(v)) {
+                              return 'Include a letter and a number';
+                            }
                             return null;
                           },
                         ),
+                        if (_isSignUp) ...[
+                          const SizedBox(height: 14),
+                          _AuthField(
+                            controller: _confirmPasswordController,
+                            hint: 'Confirm password',
+                            icon: Icons.lock_outline_rounded,
+                            obscureText: _obscureConfirmPassword,
+                            suffixIcon: IconButton(
+                              onPressed: () => setState(
+                                () => _obscureConfirmPassword =
+                                    !_obscureConfirmPassword,
+                              ),
+                              icon: Icon(
+                                _obscureConfirmPassword
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                                color: _muted,
+                                size: 18,
+                              ),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.isEmpty) {
+                                return 'Confirm your password';
+                              }
+                              if (v != _passwordController.text) {
+                                return 'Passwords do not match';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
                         if (!_isSignUp) ...[
                           const SizedBox(height: 10),
                           Align(
