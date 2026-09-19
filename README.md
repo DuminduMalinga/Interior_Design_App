@@ -1,6 +1,8 @@
-# Planly AI
+# LiviSpace
 
-Planly AI is a Flutter prototype for an AI-powered interior design workflow. It guides users from account sign-in through floor-plan upload, AI processing, room analysis, and final layout recommendations.
+*Design spaces for better living.*
+
+LiviSpace is a Flutter prototype for an AI-powered interior design workflow. It guides users from account sign-in through floor-plan upload, AI processing, room analysis, and final layout recommendations.
 
 > This project is currently a front-end demo. The AI pipeline and backend are mocked with UI-driven flows and sample data rather than live AI services or persisted user data.
 

@@ -199,29 +199,9 @@ class _WelcomeTopBar extends StatelessWidget {
 
     return Row(
       children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: c.brandGradient,
-            borderRadius: AppRadius.smAll,
-          ),
-          child: SizedBox.square(
-            dimension: 36,
-            child: Icon(Icons.bolt_rounded, color: c.onPrimary, size: 20),
-          ),
-        ),
+        const AppLogoMark(size: 32),
         const SizedBox(width: AppSpacing.sm + 1),
-        Text.rich(
-          TextSpan(
-            style: text.titleMedium,
-            children: [
-              const TextSpan(text: 'Planly '),
-              TextSpan(
-                text: 'AI',
-                style: text.titleMedium?.copyWith(color: c.primary),
-              ),
-            ],
-          ),
-        ),
+        Text('LiviSpace', style: text.titleMedium),
         const SizedBox(width: AppSpacing.sm),
         AppStatusChip(label: 'AI 3D', color: c.secondary),
         const Spacer(),

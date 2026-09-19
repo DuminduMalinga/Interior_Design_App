@@ -59,6 +59,7 @@ void main() {
     group('$name layout', () {
       testWidgets('welcome', (tester) async {
         await pumpScreen(tester, const WelcomeScreen(), size);
+        expect(find.text('LiviSpace'), findsOneWidget);
         expect(find.text('Get Started'), findsWidgets);
         // Dispose the looping hero animation.
         await tester.pumpWidget(const SizedBox());
@@ -66,6 +67,7 @@ void main() {
 
       testWidgets('sign up and sign in', (tester) async {
         await pumpScreen(tester, const AuthScreen(key: Key('up')), size);
+        expect(find.text('LiviSpace'), findsOneWidget);
         expect(find.text('Create your account'), findsOneWidget);
 
         // A different key, so the second screen gets fresh state.
@@ -121,6 +123,17 @@ void main() {
         await pumpScreen(tester, const ProfileScreen(), size);
         expect(find.text('Jamie Morgan'), findsOneWidget);
         expect(find.text('Sign out'), findsOneWidget);
+      });
+
+      testWidgets('projects', (tester) async {
+        await pumpScreen(tester, const ProjectsScreen(), size);
+        expect(find.text('Loft Apartment'), findsOneWidget);
+        expect(find.text('Rooftop Lounge'), findsOneWidget);
+
+        await tester.enterText(find.byType(TextFormField), 'coastal');
+        await tester.pump();
+        expect(find.text('Coastal Retreat'), findsOneWidget);
+        expect(find.text('Loft Apartment'), findsNothing);
       });
     });
   }
