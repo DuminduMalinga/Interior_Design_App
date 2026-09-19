@@ -16,6 +16,7 @@ part 'room_selection.dart';
 part 'layouts.dart';
 part 'admin_accounts.dart';
 part 'auth.dart';
+part 'forgot_password.dart';
 part 'welcome.dart';
 part 'profile.dart';
 part 'room_viewer.dart';

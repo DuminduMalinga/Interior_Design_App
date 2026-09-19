@@ -253,6 +253,7 @@ class AppInputField extends StatelessWidget {
   const AppInputField({
     super.key,
     this.controller,
+    this.initialValue,
     this.label,
     this.hintText,
     this.prefixIcon,
@@ -266,6 +267,10 @@ class AppInputField extends StatelessWidget {
   });
 
   final TextEditingController? controller;
+
+  /// Starting text when there's no [controller] — e.g. a locked, read-only
+  /// field that never needs its value read back out.
+  final String? initialValue;
   final String? label;
   final String? hintText;
   final IconData? prefixIcon;
@@ -282,6 +287,7 @@ class AppInputField extends StatelessWidget {
     final c = context.colors;
     final field = TextFormField(
       controller: controller,
+      initialValue: initialValue,
       validator: validator,
       onChanged: onChanged,
       keyboardType: keyboardType,
