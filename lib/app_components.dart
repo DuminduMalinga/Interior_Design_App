@@ -313,6 +313,26 @@ class AppInputField extends StatelessWidget {
   }
 }
 
+/// The LiviSpace house-and-interior glyph, cropped from brand art with a
+/// transparent background. Reused wherever the app shows its own logo
+/// (auth screen, welcome top bar, dashboard rail) instead of each screen
+/// loading the asset itself.
+class AppLogoMark extends StatelessWidget {
+  const AppLogoMark({super.key, this.size = 40});
+
+  /// Rendered height; width follows the artwork's own aspect ratio.
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      'assets/images/logo_mark.png',
+      height: size,
+      filterQuality: FilterQuality.medium,
+    );
+  }
+}
+
 /// Google's "G" mark for sign-in buttons.
 class AppGoogleMark extends StatelessWidget {
   const AppGoogleMark({super.key});
