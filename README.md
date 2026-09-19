@@ -4,7 +4,7 @@
 
 LiviSpace is a Flutter prototype for an AI-powered interior design workflow. It guides a user from a splash screen through sign-up, a floor-plan upload, mock AI processing, room selection, and ranked layout recommendations they can view in 3D.
 
-> **This is a front-end prototype.** Every "AI" step, account, and project shown in the app is mocked with sample data and UI-driven delays — there is no backend, no real image processing, and nothing persists between runs.
+
 
 ## Context for picking this up
 
