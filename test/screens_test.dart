@@ -95,6 +95,32 @@ void main() {
           size,
         );
         expect(find.text('Welcome back'), findsOneWidget);
+
+        await tester.tap(find.text('Forgot password?'));
+        await tester.pumpAndSettle();
+        expect(find.byType(ForgotPasswordScreen), findsOneWidget);
+      });
+
+      testWidgets('forgot password: username and email are locked', (
+        tester,
+      ) async {
+        await pumpScreen(tester, const ForgotPasswordScreen(), size);
+
+        // Order on screen: Username, Email, New password, Confirm password.
+        final fields = find.byType(TextFormField);
+        final usernameField = tester.widget<TextFormField>(fields.at(0));
+        final emailField = tester.widget<TextFormField>(fields.at(1));
+        expect(usernameField.enabled, isFalse);
+        expect(usernameField.initialValue, 'jamie.morgan');
+        expect(emailField.enabled, isFalse);
+        expect(emailField.initialValue, 'jamie.morgan@gmail.com');
+
+        // Mismatched passwords surface a validation error instead of resetting.
+        await tester.enterText(fields.at(2), 'newpass1');
+        await tester.enterText(fields.at(3), 'different1');
+        await tester.tap(find.text('Reset password'));
+        await tester.pump();
+        expect(find.text('Passwords do not match'), findsOneWidget);
       });
 
       testWidgets('upload', (tester) async {

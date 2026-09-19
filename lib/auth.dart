@@ -163,7 +163,11 @@ class _AuthScreenState extends State<AuthScreen> {
               child: Padding(
                 padding: const EdgeInsets.only(top: AppSpacing.sm),
                 child: TextButton(
-                  onPressed: () => _notify(context, 'Password reset'),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const ForgotPasswordScreen(),
+                    ),
+                  ),
                   child: const Text('Forgot password?'),
                 ),
               ),
