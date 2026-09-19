@@ -125,59 +125,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ],
     );
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).maybePop(),
-          tooltip: 'Back',
-          icon: const Icon(Icons.arrow_back_rounded),
-        ),
-        title: const Text('Profile'),
-      ),
-      body: AppBackground(
-        child: SafeArea(
-          child: SingleChildScrollView(
-            child: AppContentFrame(
-              child: wide
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Expanded(
-                          flex: 4,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              header,
-                              SizedBox(height: AppSpacing.xl),
-                              stats,
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.xxl),
-                        Expanded(flex: 5, child: settings),
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        header,
-                        const SizedBox(height: AppSpacing.xl),
-                        stats,
-                        const SizedBox(height: AppSpacing.xxl),
-                        settings,
-                      ],
+    return _TabScaffold(
+      selectedIndex: 3,
+      appBar: AppBar(title: const Text('Profile')),
+      body: SingleChildScrollView(
+        child: AppContentFrame(
+          child: wide
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Expanded(
+                      flex: 4,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          header,
+                          SizedBox(height: AppSpacing.xl),
+                          stats,
+                        ],
+                      ),
                     ),
-            ),
-          ),
+                    const SizedBox(width: AppSpacing.xxl),
+                    Expanded(flex: 5, child: settings),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    header,
+                    const SizedBox(height: AppSpacing.xl),
+                    stats,
+                    const SizedBox(height: AppSpacing.xxl),
+                    settings,
+                  ],
+                ),
         ),
       ),
     );
   }
 
   void _notify(BuildContext context, String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$feature coming soon.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('$feature coming soon.')));
   }
 
   void _signOut(BuildContext context) {
@@ -409,7 +399,11 @@ class _SettingsTile extends StatelessWidget {
                 const SizedBox(width: AppSpacing.sm),
               ],
               trailing ??
-                  Icon(Icons.chevron_right_rounded, color: c.textMuted, size: 20),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: c.textMuted,
+                    size: 20,
+                  ),
             ],
           ),
         ),

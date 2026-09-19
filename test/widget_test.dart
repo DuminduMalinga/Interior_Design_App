@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:interior_design/app_theme.dart';
 import 'package:interior_design/main.dart';
 
+import 'test_utils.dart';
+
 /// Pumps the dashboard (the app itself opens on the welcome screen) at the
 /// given logical size.
 Future<void> pumpAt(WidgetTester tester, Size size) async {
@@ -16,6 +18,8 @@ Future<void> pumpAt(WidgetTester tester, Size size) async {
 }
 
 void main() {
+  setUpAll(loadRoboto);
+
   testWidgets('mobile: single column with bottom nav and FAB', (tester) async {
     await pumpAt(tester, const Size(400, 800));
 
@@ -53,6 +57,40 @@ void main() {
 
     expect(find.byType(ProjectsScreen), findsOneWidget);
     expect(find.text('Rooftop Lounge'), findsOneWidget);
+  });
+
+  testWidgets('bottom nav stays visible when switching tabs on mobile', (
+    tester,
+  ) async {
+    await pumpAt(tester, const Size(400, 800));
+    expect(find.byType(BottomNavigationBar), findsOneWidget);
+
+    for (final tab in ['Projects', 'Upload', 'Profile', 'Home']) {
+      await tester.tap(find.text(tab));
+      await tester.pumpAndSettle();
+      expect(
+        find.byType(BottomNavigationBar),
+        findsOneWidget,
+        reason: 'bottom nav should still be there after switching to $tab',
+      );
+    }
+  });
+
+  testWidgets('side rail stays visible when switching tabs on desktop', (
+    tester,
+  ) async {
+    await pumpAt(tester, const Size(1440, 900));
+    expect(find.byType(NavigationRail), findsOneWidget);
+
+    for (final tab in ['Projects', 'Upload', 'Profile', 'Home']) {
+      await tester.tap(find.text(tab));
+      await tester.pumpAndSettle();
+      expect(
+        find.byType(NavigationRail),
+        findsOneWidget,
+        reason: 'side rail should still be there after switching to $tab',
+      );
+    }
   });
 
   testWidgets('See all opens the projects screen', (tester) async {
