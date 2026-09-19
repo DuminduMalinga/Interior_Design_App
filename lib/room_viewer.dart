@@ -32,10 +32,11 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final room = widget.room;
     final layout = widget.layout;
+    final roomColor = room.colorIn(c);
     return Scaffold(
-      backgroundColor: _background,
       body: SafeArea(
         child: Stack(
           children: [
@@ -58,11 +59,12 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
                     }
                   });
                 },
-                child: ColoredBox(
-                  color: _background,
+                child: AppBackground(
                   child: CustomPaint(
                     painter: _IsoRoomPainter(
-                      accent: room.color,
+                      accent: roomColor,
+                      floor: c.surface,
+                      grid: c.glassFill,
                       variant: layout.variant,
                       yaw: _yaw,
                       zoom: _zoom,
@@ -73,15 +75,15 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
               ),
             ),
             Positioned(
-              top: 4,
-              left: 12,
+              top: AppSpacing.xs,
+              left: AppSpacing.md,
               child: _GlassIconButton(
                 icon: Icons.close_rounded,
                 onTap: () => Navigator.of(context).maybePop(),
               ),
             ),
             Positioned(
-              top: 4,
+              top: AppSpacing.xs,
               left: 0,
               right: 0,
               child: Center(
@@ -89,7 +91,7 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
               ),
             ),
             Positioned(
-              right: 12,
+              right: AppSpacing.md,
               top: 0,
               bottom: 0,
               child: Center(
@@ -110,10 +112,16 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
               ),
             ),
             Positioned(
-              left: 16,
-              right: 16,
-              bottom: 12,
-              child: _ViewerToolbar(accent: room.color),
+              left: AppSpacing.lg,
+              right: AppSpacing.lg,
+              bottom: AppSpacing.md,
+              // Keeps the toolbar a sensible width on tablet and desktop.
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: _ViewerToolbar(accent: roomColor),
+                ),
+              ),
             ),
           ],
         ),
@@ -130,21 +138,22 @@ class _GlassIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Material(
-      color: Colors.transparent,
+      type: MaterialType.transparency,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        customBorder: const CircleBorder(),
         child: Container(
-          width: 40,
-          height: 40,
+          width: 44,
+          height: 44,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: const Color(0x990D111D),
+            color: c.backgroundElevated.withValues(alpha: 0.6),
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withValues(alpha: .12)),
+            border: Border.all(color: c.glassBorder),
           ),
-          child: Icon(icon, size: 19, color: Colors.white),
+          child: Icon(icon, size: 20, color: c.textPrimary),
         ),
       ),
     );
@@ -159,21 +168,25 @@ class _TitlePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.sm,
+      ),
       decoration: BoxDecoration(
-        color: const Color(0x990D111D),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: .12)),
+        color: c.backgroundElevated.withValues(alpha: 0.6),
+        borderRadius: AppRadius.fullAll,
+        border: Border.all(color: c.glassBorder),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(room.icon, size: 13, color: room.color),
-          const SizedBox(width: 6),
+          Icon(room.icon, size: 14, color: room.colorIn(c)),
+          const SizedBox(width: AppSpacing.sm - 2),
           Text(
             '${layout.title} · ${room.name}',
-            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+            style: context.text.labelMedium,
           ),
         ],
       ),
@@ -202,14 +215,14 @@ class _GestureRail extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         _GlassIconButton(icon: Icons.zoom_in_rounded, onTap: onZoomIn),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.md),
         _GlassIconButton(icon: Icons.zoom_out_rounded, onTap: onZoomOut),
-        const SizedBox(height: 22),
+        const SizedBox(height: AppSpacing.xl),
         _GlassIconButton(
           icon: Icons.rotate_left_rounded,
           onTap: onRotateLeft,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.md),
         _GlassIconButton(
           icon: Icons.rotate_right_rounded,
           onTap: onRotateRight,
@@ -226,12 +239,13 @@ class _ViewerToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       decoration: BoxDecoration(
-        color: const Color(0xE60D111D),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: .10)),
+        color: c.backgroundElevated.withValues(alpha: 0.9),
+        borderRadius: AppRadius.xlAll,
+        border: Border.all(color: c.glassBorder),
         boxShadow: [
           BoxShadow(
             color: accent.withValues(alpha: .18),
@@ -266,11 +280,7 @@ class _ViewerToolbar extends StatelessWidget {
 
   void _notify(BuildContext context, String action) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: _surface,
-        behavior: SnackBarBehavior.floating,
-        content: Text('$action coming soon.'),
-      ),
+      SnackBar(content: Text('$action coming soon.')),
     );
   }
 }
@@ -290,27 +300,23 @@ class _ToolbarAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = accent ?? Colors.white;
+    final color = accent ?? context.colors.textPrimary;
     return Material(
-      color: Colors.transparent,
+      type: MaterialType.transparency,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppRadius.smAll,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm - 2,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon, size: 20, color: color),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(label, style: context.text.labelSmall?.copyWith(color: color)),
             ],
           ),
         ),
@@ -325,12 +331,16 @@ class _ToolbarAction extends StatelessWidget {
 class _IsoRoomPainter extends CustomPainter {
   const _IsoRoomPainter({
     required this.accent,
+    required this.floor,
+    required this.grid,
     required this.variant,
     required this.yaw,
     required this.zoom,
   });
 
   final Color accent;
+  final Color floor;
+  final Color grid;
   final int variant;
   final double yaw;
   final double zoom;
@@ -355,16 +365,16 @@ class _IsoRoomPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final floor = [
+    final floorQuad = [
       _project(0, 0, 0, size),
       _project(_roomW, 0, 0, size),
       _project(_roomW, _roomD, 0, size),
       _project(0, _roomD, 0, size),
     ];
-    _quad(canvas, floor, Paint()..color = const Color(0xFF141B29));
+    _quad(canvas, floorQuad, Paint()..color = floor);
 
     final gridPaint = Paint()
-      ..color = Colors.white.withValues(alpha: .05)
+      ..color = grid
       ..strokeWidth = 1;
     for (var i = 1; i < 5; i++) {
       final t = i / 5 * _roomW;
@@ -469,6 +479,8 @@ class _IsoRoomPainter extends CustomPainter {
       oldDelegate.yaw != yaw ||
       oldDelegate.zoom != zoom ||
       oldDelegate.accent != accent ||
+      oldDelegate.floor != floor ||
+      oldDelegate.grid != grid ||
       oldDelegate.variant != variant;
 }
 
