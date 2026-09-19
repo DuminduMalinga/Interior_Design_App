@@ -34,6 +34,184 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
+<<<<<<< Updated upstream
+=======
+    final c = context.colors;
+    final text = context.text;
+    final wide = !context.screenSize.isMobile;
+
+    final form = Form(
+      key: _formKey,
+      child: Column(
+        children: [
+          const _AuthLogo(),
+          const SizedBox(height: AppSpacing.xl),
+          Text(
+            _isSignUp ? 'Create your account' : 'Welcome back',
+            textAlign: TextAlign.center,
+            style: text.headlineMedium,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            _isSignUp
+                ? 'Sign up to start turning floor plans into AI-designed spaces.'
+                : 'Sign in to pick up where you left off.',
+            textAlign: TextAlign.center,
+            style: text.bodySmall?.copyWith(color: c.textMuted),
+          ),
+          const SizedBox(height: AppSpacing.xxl),
+          if (_isSignUp) ...[
+            AppInputField(
+              controller: _fullNameController,
+              hintText: 'Full name',
+              prefixIcon: Icons.badge_outlined,
+              keyboardType: TextInputType.name,
+              textInputAction: TextInputAction.next,
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) {
+                  return 'Enter your full name';
+                }
+                if (v.trim().length < 2) return 'Name is too short';
+                if (!RegExp(r"^[a-zA-Z\s'-]+$").hasMatch(v.trim())) {
+                  return 'Only letters, spaces, - and \' allowed';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            AppInputField(
+              controller: _usernameController,
+              hintText: 'Username',
+              prefixIcon: Icons.alternate_email_rounded,
+              keyboardType: TextInputType.text,
+              textInputAction: TextInputAction.next,
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return 'Enter a username';
+                if (v.trim().length < 3) return 'At least 3 characters';
+                if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(v.trim())) {
+                  return 'Letters, numbers, _ only';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: AppSpacing.lg),
+          ],
+          AppInputField(
+            controller: _emailController,
+            hintText: 'Email address',
+            prefixIcon: Icons.mail_outline_rounded,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Enter your email';
+              if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim())) {
+                return 'Enter a valid email';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          AppInputField(
+            controller: _passwordController,
+            hintText: 'Password',
+            prefixIcon: Icons.lock_outline_rounded,
+            obscureText: _obscurePassword,
+            textInputAction:
+                _isSignUp ? TextInputAction.next : TextInputAction.done,
+            suffixIcon: _VisibilityToggle(
+              obscured: _obscurePassword,
+              onPressed: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
+            ),
+            validator: (v) {
+              if (v == null || v.isEmpty) return 'Enter your password';
+              if (v.length < 6) return 'At least 6 characters';
+              if (_isSignUp &&
+                  !RegExp(r'^(?=.*[A-Za-z])(?=.*\d).+$').hasMatch(v)) {
+                return 'Include a letter and a number';
+              }
+              return null;
+            },
+          ),
+          if (_isSignUp) ...[
+            const SizedBox(height: AppSpacing.lg),
+            AppInputField(
+              controller: _confirmPasswordController,
+              hintText: 'Confirm password',
+              prefixIcon: Icons.lock_outline_rounded,
+              obscureText: _obscureConfirmPassword,
+              textInputAction: TextInputAction.done,
+              suffixIcon: _VisibilityToggle(
+                obscured: _obscureConfirmPassword,
+                onPressed: () => setState(
+                  () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                ),
+              ),
+              validator: (v) {
+                if (v == null || v.isEmpty) return 'Confirm your password';
+                if (v != _passwordController.text) {
+                  return 'Passwords do not match';
+                }
+                return null;
+              },
+            ),
+          ],
+          if (!_isSignUp)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.sm),
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const ForgotPasswordScreen(),
+                    ),
+                  ),
+                  child: const Text('Forgot password?'),
+                ),
+              ),
+            ),
+          const SizedBox(height: AppSpacing.xl),
+          AppButton(
+            label: _isSignUp ? 'Create account' : 'Sign in',
+            loading: _submitting,
+            onPressed: _submit,
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          const _OrDivider(),
+          const SizedBox(height: AppSpacing.lg),
+          OutlinedButton.icon(
+            onPressed: () => _notify(context, 'Google sign-in'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              backgroundColor: c.glassFill,
+              side: BorderSide(color: c.glassBorder),
+            ),
+            icon: const AppGoogleMark(),
+            label: const Text('Continue with Google'),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                _isSignUp
+                    ? 'Already have an account?'
+                    : "Don't have an account?",
+                style: text.bodySmall?.copyWith(color: c.textMuted),
+              ),
+              TextButton(
+                onPressed: () => setState(() => _isSignUp = !_isSignUp),
+                child: Text(_isSignUp ? 'Sign in' : 'Sign up'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+>>>>>>> Stashed changes
     return Scaffold(
       backgroundColor: _background,
       body: Stack(
