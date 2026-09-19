@@ -184,7 +184,7 @@ class _AuthScreenState extends State<AuthScreen> {
               backgroundColor: c.glassFill,
               side: BorderSide(color: c.glassBorder),
             ),
-            icon: const _GoogleMark(),
+            icon: const AppGoogleMark(),
             label: const Text('Continue with Google'),
           ),
           const SizedBox(height: AppSpacing.xl),
@@ -325,34 +325,6 @@ class _OrDivider extends StatelessWidget {
         ),
         Expanded(child: Divider(color: c.border)),
       ],
-    );
-  }
-}
-
-/// Google's brand mark. Its colours are Google's, not ours, so they are the
-/// one intentional exception to the theme tokens.
-class _GoogleMark extends StatelessWidget {
-  const _GoogleMark();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 20,
-      height: 20,
-      alignment: Alignment.center,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white,
-      ),
-      child: const Text(
-        'G',
-        style: TextStyle(
-          color: Color(0xFF4285F4),
-          fontSize: 12,
-          fontWeight: FontWeight.w900,
-          height: 1,
-        ),
-      ),
     );
   }
 }
