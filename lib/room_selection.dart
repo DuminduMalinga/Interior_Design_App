@@ -12,11 +12,31 @@ class RoomSelectionScreen extends StatefulWidget {
   State<RoomSelectionScreen> createState() => _RoomSelectionScreenState();
 }
 
+/// Which theme colour a detected room is drawn in.
+enum _RoomAccent {
+  primary,
+  secondary,
+  accent;
+
+  Color resolve(AppColors c) => switch (this) {
+    primary => c.primary,
+    secondary => c.secondary,
+    accent => c.accent,
+  };
+}
+
+/// Maps an AI score (0-100) to a status colour: strong, good or fair.
+AppStatus _scoreStatus(int score) {
+  if (score >= 90) return AppStatus.success;
+  if (score >= 75) return AppStatus.info;
+  return AppStatus.warning;
+}
+
 class _DetectedRoom {
   const _DetectedRoom({
     required this.name,
     required this.icon,
-    required this.color,
+    required this.accent,
     required this.bounds,
     required this.suitability,
     required this.note,
@@ -24,7 +44,7 @@ class _DetectedRoom {
 
   final String name;
   final IconData icon;
-  final Color color;
+  final _RoomAccent accent;
 
   /// Fractional bounds (0-1) within the floor plan diagram.
   final Rect bounds;
@@ -32,6 +52,8 @@ class _DetectedRoom {
   /// AI confidence/suitability score out of 100.
   final int suitability;
   final String note;
+
+  Color colorIn(AppColors c) => accent.resolve(c);
 
   String get tag {
     if (suitability >= 90) return 'Excellent fit';
@@ -44,7 +66,7 @@ const _detectedRooms = [
   _DetectedRoom(
     name: 'Living Room',
     icon: Icons.weekend_outlined,
-    color: _blue,
+    accent: _RoomAccent.primary,
     bounds: Rect.fromLTWH(0, 0, .58, .62),
     suitability: 96,
     note: 'Bright, open layout — ideal for a statement centerpiece.',
@@ -52,7 +74,7 @@ const _detectedRooms = [
   _DetectedRoom(
     name: 'Kitchen',
     icon: Icons.kitchen_outlined,
-    color: Color(0xFF35C5B5),
+    accent: _RoomAccent.accent,
     bounds: Rect.fromLTWH(.6, 0, .4, .38),
     suitability: 88,
     note: 'Efficient galley shape close to the dining area.',
@@ -60,7 +82,7 @@ const _detectedRooms = [
   _DetectedRoom(
     name: 'Bedroom',
     icon: Icons.bed_outlined,
-    color: _violet,
+    accent: _RoomAccent.secondary,
     bounds: Rect.fromLTWH(.6, .42, .4, .58),
     suitability: 74,
     note: 'Cozy corner room with limited natural light.',
@@ -72,102 +94,88 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+    final text = context.text;
     final room = _detectedRooms[_selected];
+    final wide = !context.screenSize.isMobile;
+
+    final diagram = _FloorPlanDiagram(
+      rooms: _detectedRooms,
+      selected: _selected,
+      onSelect: (i) => setState(() => _selected = i),
+    );
+    final list = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Detected rooms', style: text.titleMedium),
+        const SizedBox(height: AppSpacing.md),
+        for (var i = 0; i < _detectedRooms.length; i++) ...[
+          _RoomCard(
+            room: _detectedRooms[i],
+            selected: i == _selected,
+            onTap: () => setState(() => _selected = i),
+          ),
+          if (i != _detectedRooms.length - 1)
+            const SizedBox(height: AppSpacing.md),
+        ],
+        const SizedBox(height: AppSpacing.xl),
+        AppButton(
+          label: 'Design the ${room.name}',
+          icon: Icons.auto_awesome_rounded,
+          onPressed: () => _openLayouts(context, room),
+        ),
+      ],
+    );
+
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: _background,
         leading: IconButton(
           onPressed: () => Navigator.of(context).maybePop(),
           tooltip: 'Back',
           icon: const Icon(Icons.arrow_back_rounded),
         ),
-        title: const Text(
-          'Select a room',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-        ),
-        centerTitle: true,
+        title: const Text('Select a room'),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _AiPill(),
-              const SizedBox(height: 13),
-              const Text(
-                'We found 3 rooms',
-                style: TextStyle(
-                  fontSize: 23,
-                  height: 1.15,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -.5,
-                ),
-              ),
-              const SizedBox(height: 7),
-              const Text(
-                'Tap a room on the plan or in the list to see how well it '
-                'suits an AI redesign.',
-                style: TextStyle(color: _muted, fontSize: 13, height: 1.4),
-              ),
-              const SizedBox(height: 22),
-              _FloorPlanDiagram(
-                rooms: _detectedRooms,
-                selected: _selected,
-                onSelect: (i) => setState(() => _selected = i),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Detected rooms',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 12),
-              for (var i = 0; i < _detectedRooms.length; i++) ...[
-                _RoomCard(
-                  room: _detectedRooms[i],
-                  selected: i == _selected,
-                  onTap: () => setState(() => _selected = i),
-                ),
-                if (i != _detectedRooms.length - 1) const SizedBox(height: 10),
-              ],
-              const SizedBox(height: 26),
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [_blue, _violet]),
-                    borderRadius: BorderRadius.circular(17),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _blue.withValues(alpha: .24),
-                        blurRadius: 22,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: ElevatedButton.icon(
-                    onPressed: () => _openLayouts(context, room),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      foregroundColor: Colors.white,
-                      shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(17),
-                      ),
-                    ),
-                    icon: const Icon(Icons.auto_awesome_rounded, size: 20),
-                    label: Text(
-                      'Design the ${room.name}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                      ),
+      body: AppBackground(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            child: AppContentFrame(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _AiPill(),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    'We found 3 rooms',
+                    style: context.responsive(
+                      mobile: text.headlineMedium,
+                      tablet: text.headlineLarge,
                     ),
                   ),
-                ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Tap a room on the plan or in the list to see how well it '
+                    'suits an AI redesign.',
+                    style: text.bodyMedium?.copyWith(color: c.textSecondary),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  if (wide)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 5, child: diagram),
+                        const SizedBox(width: AppSpacing.xxl),
+                        Expanded(flex: 4, child: list),
+                      ],
+                    )
+                  else ...[
+                    diagram,
+                    const SizedBox(height: AppSpacing.xl),
+                    list,
+                  ],
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -196,13 +204,21 @@ class _FloorPlanDiagram extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+
     return AspectRatio(
       aspectRatio: 1.05,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final size = Size(constraints.maxWidth, constraints.maxHeight);
+          // Hit-testing uses the painted area, which is inset by the padding.
+          const padding = AppSpacing.lg;
+          final size = Size(
+            constraints.maxWidth - padding * 2,
+            constraints.maxHeight - padding * 2,
+          );
           return GestureDetector(
             onTapUp: (details) {
+              final local = details.localPosition - const Offset(padding, padding);
               for (var i = rooms.length - 1; i >= 0; i--) {
                 final rect = Rect.fromLTWH(
                   rooms[i].bounds.left * size.width,
@@ -210,28 +226,22 @@ class _FloorPlanDiagram extends StatelessWidget {
                   rooms[i].bounds.width * size.width,
                   rooms[i].bounds.height * size.height,
                 );
-                if (rect.contains(details.localPosition)) {
+                if (rect.contains(local)) {
                   onSelect(i);
                   return;
                 }
               }
             },
-            child: Container(
-              decoration: BoxDecoration(
-                color: _surface,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: Colors.white.withValues(alpha: .08)),
-                boxShadow: [
-                  BoxShadow(
-                    color: _blue.withValues(alpha: .08),
-                    blurRadius: 30,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(14),
+            child: AppCard(
+              radius: AppRadius.xlAll,
+              padding: const EdgeInsets.all(padding),
               child: CustomPaint(
-                painter: _FloorPlanPainter(rooms: rooms, selected: selected),
+                painter: _FloorPlanPainter(
+                  rooms: rooms,
+                  selected: selected,
+                  colors: c,
+                  labelStyle: context.text.labelSmall!,
+                ),
                 size: Size.infinite,
               ),
             ),
@@ -243,21 +253,29 @@ class _FloorPlanDiagram extends StatelessWidget {
 }
 
 class _FloorPlanPainter extends CustomPainter {
-  const _FloorPlanPainter({required this.rooms, required this.selected});
+  const _FloorPlanPainter({
+    required this.rooms,
+    required this.selected,
+    required this.colors,
+    required this.labelStyle,
+  });
 
   final List<_DetectedRoom> rooms;
   final int selected;
+  final AppColors colors;
+  final TextStyle labelStyle;
 
   @override
   void paint(Canvas canvas, Size size) {
     final outline = Paint()
-      ..color = Colors.white.withValues(alpha: .28)
+      ..color = colors.textPrimary.withValues(alpha: 0.28)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.6;
     canvas.drawRect(Offset.zero & size, outline);
 
     for (var i = 0; i < rooms.length; i++) {
       final room = rooms[i];
+      final color = room.colorIn(colors);
       final isSelected = i == selected;
       final rect = Rect.fromLTWH(
         room.bounds.left * size.width,
@@ -268,22 +286,24 @@ class _FloorPlanPainter extends CustomPainter {
 
       if (isSelected) {
         final glow = Paint()
-          ..color = room.color.withValues(alpha: .35)
+          ..color = color.withValues(alpha: 0.35)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
         canvas.drawRect(rect, glow);
       }
 
-      final fill = Paint()
-        ..color = room.color.withValues(alpha: isSelected ? .30 : .14);
-      canvas.drawRect(rect, fill);
+      canvas.drawRect(
+        rect,
+        Paint()..color = color.withValues(alpha: isSelected ? 0.30 : 0.14),
+      );
+      canvas.drawRect(
+        rect,
+        Paint()
+          ..color = color.withValues(alpha: isSelected ? 1 : 0.55)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = isSelected ? 2.4 : 1.2,
+      );
 
-      final border = Paint()
-        ..color = room.color.withValues(alpha: isSelected ? 1 : .55)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = isSelected ? 2.4 : 1.2;
-      canvas.drawRect(rect, border);
-
-      _paintLabel(canvas, rect, room, isSelected);
+      _paintLabel(canvas, rect, room, color, isSelected);
     }
   }
 
@@ -291,6 +311,7 @@ class _FloorPlanPainter extends CustomPainter {
     Canvas canvas,
     Rect rect,
     _DetectedRoom room,
+    Color color,
     bool isSelected,
   ) {
     final iconSpan = TextSpan(
@@ -299,16 +320,12 @@ class _FloorPlanPainter extends CustomPainter {
         fontSize: 15,
         fontFamily: room.icon.fontFamily,
         package: room.icon.fontPackage,
-        color: Colors.white,
+        color: colors.onPrimary,
       ),
     );
     final labelSpan = TextSpan(
       text: '  ${room.name}',
-      style: const TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w800,
-        color: Colors.white,
-      ),
+      style: labelStyle.copyWith(color: colors.onPrimary),
     );
     final painter = TextPainter(
       text: TextSpan(children: [iconSpan, labelSpan]),
@@ -325,18 +342,19 @@ class _FloorPlanPainter extends CustomPainter {
       pillWidth,
       pillHeight,
     );
-    final pillPaint = Paint()
-      ..color = room.color.withValues(alpha: isSelected ? .9 : .55);
     canvas.drawRRect(
       RRect.fromRectAndRadius(pillRect, const Radius.circular(10)),
-      pillPaint,
+      Paint()..color = color.withValues(alpha: isSelected ? 0.9 : 0.55),
     );
     painter.paint(canvas, pillRect.topLeft + const Offset(8, 5));
   }
 
   @override
   bool shouldRepaint(covariant _FloorPlanPainter oldDelegate) =>
-      oldDelegate.selected != selected || oldDelegate.rooms != rooms;
+      oldDelegate.selected != selected ||
+      oldDelegate.rooms != rooms ||
+      oldDelegate.colors != colors ||
+      oldDelegate.labelStyle != labelStyle;
 }
 
 /// A tappable card summarizing a detected room and its AI suitability score.
@@ -351,132 +369,78 @@ class _RoomCard extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  Color get _scoreColor {
-    if (room.suitability >= 90) return const Color(0xFF4ADE80);
-    if (room.suitability >= 75) return const Color(0xFF4D9BFF);
-    return const Color(0xFFF6C86A);
-  }
-
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    final c = context.colors;
+    final text = context.text;
+    final color = room.colorIn(c);
+    final status = _scoreStatus(room.suitability);
+    final scoreColor = status.colorIn(c);
+
+    return AppCard(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: selected ? _blue.withValues(alpha: .08) : _surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: selected
-                ? _blue.withValues(alpha: .55)
-                : Colors.white.withValues(alpha: .07),
-            width: selected ? 1.4 : 1,
+      color: selected ? c.primary.withValues(alpha: 0.08) : null,
+      borderColor: selected ? c.primary.withValues(alpha: 0.55) : null,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color.withValues(alpha: 0.18),
+              border: Border.all(color: color.withValues(alpha: 0.4)),
+            ),
+            child: SizedBox.square(
+              dimension: 48,
+              child: Icon(room.icon, color: color, size: 22),
+            ),
           ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: room.color.withValues(alpha: .18),
-                border: Border.all(color: room.color.withValues(alpha: .4)),
-              ),
-              child: Icon(room.icon, color: room.color, size: 22),
-            ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          room.name,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      _SuitabilityBadge(
-                        score: room.suitability,
-                        color: _scoreColor,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    room.tag,
-                    style: TextStyle(
-                      color: _scoreColor,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: Text(room.name, style: text.titleSmall)),
+                    AppStatusChip(
+                      label: '${room.suitability}% match',
+                      status: status,
                     ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  room.tag,
+                  style: text.labelMedium?.copyWith(color: scoreColor),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  room.note,
+                  style: text.bodySmall?.copyWith(color: c.textMuted),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                ClipRRect(
+                  borderRadius: AppRadius.fullAll,
+                  child: LinearProgressIndicator(
+                    value: room.suitability / 100,
+                    minHeight: 5,
+                    backgroundColor: c.glassFill,
+                    valueColor: AlwaysStoppedAnimation(scoreColor),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    room.note,
-                    style: const TextStyle(
-                      color: _muted,
-                      fontSize: 11,
-                      height: 1.35,
-                    ),
-                  ),
-                  const SizedBox(height: 9),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      value: room.suitability / 100,
-                      minHeight: 5,
-                      backgroundColor: Colors.white.withValues(alpha: .08),
-                      valueColor: AlwaysStoppedAnimation(_scoreColor),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(width: 6),
-            Icon(
-              selected
-                  ? Icons.check_circle_rounded
-                  : Icons.radio_button_unchecked_rounded,
-              color: selected ? _blue : Colors.white.withValues(alpha: .18),
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SuitabilityBadge extends StatelessWidget {
-  const _SuitabilityBadge({required this.score, required this.color});
-
-  final int score;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: .16),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: .4)),
-      ),
-      child: Text(
-        '$score% match',
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-        ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Icon(
+            selected
+                ? Icons.check_circle_rounded
+                : Icons.radio_button_unchecked_rounded,
+            color: selected ? c.primary : c.border,
+            size: 20,
+          ),
+        ],
       ),
     );
   }
