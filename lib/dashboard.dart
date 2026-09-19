@@ -17,12 +17,31 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedTab = 0;
 
-  void _select(int index) => setState(() => _selectedTab = index);
+  // Upload and Profile open their own screens; the other tabs just highlight.
+  void _select(int index) {
+    switch (index) {
+      case 2:
+        _open(const UploadScreen());
+      case 3:
+        _open(const ProfileScreen());
+      default:
+        setState(() => _selectedTab = index);
+    }
+  }
+
+  void _open(Widget screen) {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen));
+  }
 
   @override
   Widget build(BuildContext context) {
     final size = context.screenSize;
-    final content = _DashboardContent(size: size, onSeeAll: () => _select(1));
+    final content = _DashboardContent(
+      size: size,
+      onSeeAll: () => _select(1),
+      onAvatarTap: () => _open(const ProfileScreen()),
+      onAdminTap: () => _open(const AdminAccountsScreen()),
+    );
 
     return Scaffold(
       body: DecoratedBox(
@@ -45,7 +64,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       floatingActionButton: size.isMobile
           ? FloatingActionButton(
               heroTag: 'new-upload',
-              onPressed: () {},
+              onPressed: () => _open(const UploadScreen()),
               tooltip: 'New upload',
               child: const Icon(Icons.add_rounded, size: 28),
             )
@@ -65,10 +84,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 class _DashboardContent extends StatelessWidget {
-  const _DashboardContent({required this.size, required this.onSeeAll});
+  const _DashboardContent({
+    required this.size,
+    required this.onSeeAll,
+    required this.onAvatarTap,
+    required this.onAdminTap,
+  });
 
   final ScreenSize size;
   final VoidCallback onSeeAll;
+  final VoidCallback onAvatarTap;
+  final VoidCallback onAdminTap;
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +107,7 @@ class _DashboardContent extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _Header(),
+            _Header(onAvatarTap: onAvatarTap, onAdminTap: onAdminTap),
             const SizedBox(height: AppSpacing.xxl),
             if (size.isDesktop)
               const IntrinsicHeight(
@@ -175,27 +201,56 @@ class _SideNav extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header();
+  const _Header({required this.onAvatarTap, required this.onAdminTap});
+
+  final VoidCallback onAvatarTap;
+  final VoidCallback onAdminTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final text = context.text;
 
+    IconButton actionButton({
+      required IconData icon,
+      required String tooltip,
+      required VoidCallback onPressed,
+    }) {
+      return IconButton(
+        onPressed: onPressed,
+        tooltip: tooltip,
+        style: IconButton.styleFrom(
+          backgroundColor: c.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppRadius.mdAll,
+            side: BorderSide(color: c.border),
+          ),
+        ),
+        icon: Icon(icon, size: 22, color: c.textPrimary),
+      );
+    }
+
     return Row(
       children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: c.brandGradient,
-            border: Border.all(color: c.glassBorder, width: 1.5),
-          ),
-          child: SizedBox.square(
-            dimension: 48,
-            child: Center(
-              child: Text(
-                'JM',
-                style: text.labelLarge?.copyWith(color: c.onPrimary),
+        Tooltip(
+          message: 'Profile',
+          child: InkWell(
+            onTap: onAvatarTap,
+            customBorder: const CircleBorder(),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: c.brandGradient,
+                border: Border.all(color: c.glassBorder, width: 1.5),
+              ),
+              child: SizedBox.square(
+                dimension: 48,
+                child: Center(
+                  child: Text(
+                    'JM',
+                    style: text.labelLarge?.copyWith(color: c.onPrimary),
+                  ),
+                ),
               ),
             ),
           ),
@@ -219,21 +274,16 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
-        IconButton(
-          onPressed: () {},
+        actionButton(
+          icon: Icons.admin_panel_settings_outlined,
+          tooltip: 'Manage accounts',
+          onPressed: onAdminTap,
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        actionButton(
+          icon: Icons.notifications_none_rounded,
           tooltip: 'Notifications',
-          style: IconButton.styleFrom(
-            backgroundColor: c.surface,
-            shape: RoundedRectangleBorder(
-              borderRadius: AppRadius.mdAll,
-              side: BorderSide(color: c.border),
-            ),
-          ),
-          icon: Icon(
-            Icons.notifications_none_rounded,
-            size: 22,
-            color: c.textPrimary,
-          ),
+          onPressed: () {},
         ),
       ],
     );
@@ -310,11 +360,7 @@ class _HeroBanner extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const AppStatusChip(
-                      label: 'Powered by AI',
-                      status: AppStatus.info,
-                      icon: Icons.auto_awesome_rounded,
-                    ),
+                    const _AiPill(),
                     const SizedBox(height: AppSpacing.lg),
                     Text(
                       'Turn sketches into smart floor plans.',
@@ -345,6 +391,21 @@ class _HeroBanner extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Shared with the room selection screen, which is why it lives at library
+/// level instead of inside the hero.
+class _AiPill extends StatelessWidget {
+  const _AiPill();
+
+  @override
+  Widget build(BuildContext context) {
+    return const AppStatusChip(
+      label: 'Powered by AI',
+      status: AppStatus.info,
+      icon: Icons.auto_awesome_rounded,
     );
   }
 }
