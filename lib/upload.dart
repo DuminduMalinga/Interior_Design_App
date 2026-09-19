@@ -44,53 +44,43 @@ class _UploadScreenState extends State<UploadScreen> {
       ],
     );
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Upload floor plan'),
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).maybePop(),
-          tooltip: 'Back',
-          icon: const Icon(Icons.arrow_back_rounded),
-        ),
-      ),
-      body: AppBackground(
-        child: SafeArea(
-          child: SingleChildScrollView(
-            child: AppContentFrame(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Bring your space to life',
-                    style: context.responsive(
-                      mobile: text.headlineMedium,
-                      tablet: text.headlineLarge,
-                      desktop: text.displayMedium,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    'Upload a floor plan and our AI will turn it into a smart, editable design.',
-                    style: text.bodyMedium?.copyWith(color: c.textSecondary),
-                  ),
-                  const SizedBox(height: AppSpacing.xxl),
-                  if (wide)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: dropzone),
-                        const SizedBox(width: AppSpacing.xxl),
-                        Expanded(child: details),
-                      ],
-                    )
-                  else ...[
-                    dropzone,
-                    const SizedBox(height: AppSpacing.xxl),
-                    details,
-                  ],
-                ],
+    return _TabScaffold(
+      selectedIndex: 2,
+      appBar: AppBar(title: const Text('Upload floor plan')),
+      body: SingleChildScrollView(
+        child: AppContentFrame(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Bring your space to life',
+                style: context.responsive(
+                  mobile: text.headlineMedium,
+                  tablet: text.headlineLarge,
+                  desktop: text.displayMedium,
+                ),
               ),
-            ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Upload a floor plan and our AI will turn it into a smart, editable design.',
+                style: text.bodyMedium?.copyWith(color: c.textSecondary),
+              ),
+              const SizedBox(height: AppSpacing.xxl),
+              if (wide)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: dropzone),
+                    const SizedBox(width: AppSpacing.xxl),
+                    Expanded(child: details),
+                  ],
+                )
+              else ...[
+                dropzone,
+                const SizedBox(height: AppSpacing.xxl),
+                details,
+              ],
+            ],
           ),
         ),
       ),
@@ -544,9 +534,7 @@ class _ProcessingRingPainter extends CustomPainter {
     );
 
     final ring = Paint()
-      ..shader = SweepGradient(
-        colors: [start, end, start],
-      ).createShader(rect)
+      ..shader = SweepGradient(colors: [start, end, start]).createShader(rect)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeWidth = 9;
