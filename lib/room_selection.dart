@@ -317,7 +317,7 @@ class _FloorPlanPainter extends CustomPainter {
     final iconSpan = TextSpan(
       text: String.fromCharCode(room.icon.codePoint),
       style: TextStyle(
-        fontSize: 15,
+        fontSize: AppIconSize.sm,
         fontFamily: room.icon.fontFamily,
         package: room.icon.fontPackage,
         color: colors.onPrimary,
