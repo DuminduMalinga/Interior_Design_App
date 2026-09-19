@@ -20,14 +20,6 @@ part 'room_viewer.dart';
 
 void main() => runApp(const MyApp());
 
-// Legacy colour constants still used by screens that have not been moved to
-// AppColors yet (everything except the dashboard). Prefer `context.colors`.
-const _background = Color(0xFF080B14);
-const _surface = Color(0xFF111624);
-const _muted = Color(0xFF8991A6);
-const _blue = Color(0xFF4D9BFF);
-const _violet = Color(0xFF8A6BFF);
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
