@@ -287,20 +287,14 @@ class _AuthLogo extends StatelessWidget {
 
     return Column(
       children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: c.brandGradient,
-            border: Border.all(color: c.glassBorder),
-            boxShadow: AppShadows.glow(c.primary),
-          ),
-          child: SizedBox.square(
-            dimension: 64,
-            child: Icon(Icons.auto_awesome_rounded, color: c.onPrimary, size: 28),
-          ),
-        ),
+        const AppLogoMark(size: 72),
         const SizedBox(height: AppSpacing.md),
-        Text('Planly AI', style: context.text.titleMedium),
+        Text('LiviSpace', style: context.text.titleLarge),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Design spaces for better living',
+          style: context.text.labelSmall?.copyWith(color: c.textMuted),
+        ),
       ],
     );
   }

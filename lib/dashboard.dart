@@ -17,9 +17,11 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedTab = 0;
 
-  // Upload and Profile open their own screens; the other tabs just highlight.
+  // Every tab but Home opens its own screen; Home just stays put.
   void _select(int index) {
     switch (index) {
+      case 1:
+        _open(const ProjectsScreen());
       case 2:
         _open(const UploadScreen());
       case 3:
@@ -173,20 +175,10 @@ class _SideNav extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: c.brandGradient,
-                  borderRadius: AppRadius.smAll,
-                  boxShadow: AppShadows.glow(c.primary),
-                ),
-                child: SizedBox.square(
-                  dimension: 40,
-                  child: Icon(Icons.home_work_rounded, color: c.onPrimary),
-                ),
-              ),
+              const AppLogoMark(size: 40),
               if (extended) ...[
                 const SizedBox(width: AppSpacing.md),
-                Text('Planly AI', style: context.text.titleLarge),
+                Text('LiviSpace', style: context.text.titleLarge),
               ],
             ],
           ),
@@ -419,38 +411,67 @@ class _Project {
   final String imageUrl;
 }
 
+/// Mock project data shared by the dashboard's "Recent Projects" preview and
+/// the full [ProjectsScreen] list. There is no backend yet, so this stands in
+/// for a user's saved projects.
+List<_Project> _mockProjects(AppColors c) => [
+  _Project(
+    'Loft Apartment',
+    'Just now',
+    c.primary,
+    'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=900&q=85',
+  ),
+  _Project(
+    'Coastal Retreat',
+    'Yesterday',
+    c.accent,
+    'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=900&q=85',
+  ),
+  _Project(
+    'Studio Workspace',
+    'Aug 24, 2024',
+    c.secondary,
+    'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=85',
+  ),
+  _Project(
+    'Family Residence',
+    'Aug 18, 2024',
+    c.warning,
+    'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=900&q=85',
+  ),
+  _Project(
+    'Downtown Penthouse',
+    'Aug 12, 2024',
+    c.primary,
+    'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=900&q=85',
+  ),
+  _Project(
+    'Garden Bungalow',
+    'Aug 5, 2024',
+    c.accent,
+    'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=900&q=85',
+  ),
+  _Project(
+    'Minimalist Studio',
+    'Jul 29, 2024',
+    c.secondary,
+    'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=900&q=85',
+  ),
+  _Project(
+    'Rooftop Lounge',
+    'Jul 21, 2024',
+    c.warning,
+    'https://images.unsplash.com/photo-1615873968403-89e068629265?auto=format&fit=crop&w=900&q=85',
+  ),
+];
+
 class _ProjectGrid extends StatelessWidget {
   const _ProjectGrid();
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
-    final projects = [
-      _Project(
-        'Loft Apartment',
-        'Just now',
-        c.primary,
-        'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=900&q=85',
-      ),
-      _Project(
-        'Coastal Retreat',
-        'Yesterday',
-        c.accent,
-        'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=900&q=85',
-      ),
-      _Project(
-        'Studio Workspace',
-        'Aug 24, 2024',
-        c.secondary,
-        'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=85',
-      ),
-      _Project(
-        'Family Residence',
-        'Aug 18, 2024',
-        c.warning,
-        'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=900&q=85',
-      ),
-    ];
+    // The dashboard only teases recent work; "See all" opens the full list.
+    final projects = _mockProjects(context.colors).take(4).toList();
 
     return AppResponsiveGrid(
       mobileColumns: 2,
