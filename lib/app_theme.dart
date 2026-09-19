@@ -30,6 +30,19 @@ abstract final class AppRadius {
   static const BorderRadius fullAll = BorderRadius.all(Radius.circular(full));
 }
 
+/// Icon sizes, for icons drawn at a fixed size (including painted glyphs).
+abstract final class AppIconSize {
+  static const double sm = 16;
+  static const double md = 20;
+  static const double lg = 24;
+}
+
+/// Third-party brand colours. These belong to the brand, not to our palette,
+/// so they live here by name instead of being scattered as literals.
+abstract final class AppBrand {
+  static const Color google = Color(0xFF4285F4);
+}
+
 /// Material elevation values, for widgets that take a `double elevation`.
 abstract final class AppElevation {
   static const double card = 4;

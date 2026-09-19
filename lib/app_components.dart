@@ -313,6 +313,34 @@ class AppInputField extends StatelessWidget {
   }
 }
 
+/// Google's "G" mark for sign-in buttons.
+class AppGoogleMark extends StatelessWidget {
+  const AppGoogleMark({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white,
+      ),
+      child: SizedBox.square(
+        dimension: AppIconSize.md,
+        child: Center(
+          child: Text(
+            'G',
+            style: context.text.labelMedium?.copyWith(
+              color: AppBrand.google,
+              fontWeight: FontWeight.w900,
+              height: 1,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class AppSectionHeader extends StatelessWidget {
   const AppSectionHeader({
     super.key,
