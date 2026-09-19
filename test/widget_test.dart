@@ -45,6 +45,25 @@ void main() {
     expect(find.textContaining('Pro tip'), findsOneWidget);
   });
 
+  testWidgets('Projects tab opens the projects screen', (tester) async {
+    await pumpAt(tester, const Size(400, 800));
+
+    await tester.tap(find.text('Projects'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ProjectsScreen), findsOneWidget);
+    expect(find.text('Rooftop Lounge'), findsOneWidget);
+  });
+
+  testWidgets('See all opens the projects screen', (tester) async {
+    await pumpAt(tester, const Size(400, 800));
+
+    await tester.tap(find.text('See all'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ProjectsScreen), findsOneWidget);
+  });
+
   testWidgets('opens the floor plan upload screen', (
     WidgetTester tester,
   ) async {

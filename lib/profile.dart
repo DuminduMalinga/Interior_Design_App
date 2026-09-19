@@ -105,7 +105,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             _SettingsTile(
               icon: Icons.info_outline_rounded,
-              title: 'About Planly AI',
+              title: 'About LiviSpace',
               subtitle: 'Version 1.0.0',
               onTap: () => _notify(context, 'About'),
             ),
