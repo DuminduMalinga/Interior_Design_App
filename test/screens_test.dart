@@ -57,6 +57,24 @@ void main() {
 
   for (final MapEntry(key: name, value: size) in _sizes.entries) {
     group('$name layout', () {
+      testWidgets('splash shows the logo then hands off to welcome', (
+        tester,
+      ) async {
+        await pumpScreen(tester, const SplashScreen(), size);
+        expect(find.text('LiviSpace'), findsOneWidget);
+        expect(find.byType(WelcomeScreen), findsNothing);
+
+        // Fire the hold timer and let the route transition run. Splash's
+        // loading line and welcome's hero float both repeat forever, so
+        // pumpAndSettle would never return — pump explicit durations instead.
+        await tester.pump(const Duration(milliseconds: 1800));
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.byType(WelcomeScreen), findsOneWidget);
+
+        // Dispose the welcome screen's looping hero animation.
+        await tester.pumpWidget(const SizedBox());
+      });
+
       testWidgets('welcome', (tester) async {
         await pumpScreen(tester, const WelcomeScreen(), size);
         expect(find.text('LiviSpace'), findsOneWidget);
