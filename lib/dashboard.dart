@@ -7,80 +7,102 @@ const _navItems = [
   (Icons.person_outline_rounded, 'Profile'),
 ];
 
-class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
-
-  @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+/// Switches to one of the four tab screens.
+///
+/// Uses [Navigator.pushReplacement] rather than [Navigator.push]: pushing
+/// would stack the new tab's screen on top of the old one, and since only
+/// the *current* screen draws the nav bar/rail, the whole shell would
+/// visibly disappear while its (identical-looking) replacement slid in.
+/// Replacing keeps exactly one tab screen on the stack at a time, so the
+/// bar never hides.
+void _switchTab(BuildContext context, int index) {
+  final screen = switch (index) {
+    1 => const ProjectsScreen(),
+    2 => const UploadScreen(),
+    3 => const ProfileScreen(),
+    _ => const DashboardScreen(),
+  };
+  Navigator.of(
+    context,
+  ).pushReplacement(MaterialPageRoute<void>(builder: (_) => screen));
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
-  int _selectedTab = 0;
+/// Shared chrome for the four tab screens: a bottom nav on mobile or a side
+/// rail on wider screens. Every tab screen renders through this so the nav
+/// stays visually identical — and present — no matter which tab is active.
+class _TabScaffold extends StatelessWidget {
+  const _TabScaffold({
+    required this.selectedIndex,
+    required this.body,
+    this.appBar,
+    this.floatingActionButton,
+  });
 
-  // Every tab but Home opens its own screen; Home just stays put.
-  void _select(int index) {
-    switch (index) {
-      case 1:
-        _open(const ProjectsScreen());
-      case 2:
-        _open(const UploadScreen());
-      case 3:
-        _open(const ProfileScreen());
-      default:
-        setState(() => _selectedTab = index);
-    }
-  }
-
-  void _open(Widget screen) {
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen));
-  }
+  final int selectedIndex;
+  final Widget body;
+  final PreferredSizeWidget? appBar;
+  final Widget? floatingActionButton;
 
   @override
   Widget build(BuildContext context) {
     final size = context.screenSize;
-    final content = _DashboardContent(
-      size: size,
-      onSeeAll: () => _select(1),
-      onAvatarTap: () => _open(const ProfileScreen()),
-      onAdminTap: () => _open(const AdminAccountsScreen()),
-    );
 
     return Scaffold(
+      appBar: appBar,
       body: DecoratedBox(
         decoration: BoxDecoration(gradient: context.colors.backgroundGradient),
         child: SafeArea(
           child: size.isMobile
-              ? content
+              ? body
               : Row(
                   children: [
                     _SideNav(
                       extended: size.isDesktop,
-                      selectedIndex: _selectedTab,
-                      onSelected: _select,
+                      selectedIndex: selectedIndex,
+                      onSelected: (index) => _switchTab(context, index),
                     ),
-                    Expanded(child: content),
+                    Expanded(child: body),
                   ],
                 ),
         ),
       ),
-      floatingActionButton: size.isMobile
-          ? FloatingActionButton(
-              heroTag: 'new-upload',
-              onPressed: () => _open(const UploadScreen()),
-              tooltip: 'New upload',
-              child: const Icon(Icons.add_rounded, size: 28),
-            )
-          : null,
+      // Wide screens show the same destinations in the side rail instead.
+      floatingActionButton: size.isMobile ? floatingActionButton : null,
       bottomNavigationBar: size.isMobile
           ? BottomNavigationBar(
-              currentIndex: _selectedTab,
-              onTap: _select,
+              currentIndex: selectedIndex,
+              onTap: (index) => _switchTab(context, index),
               items: [
                 for (final (icon, label) in _navItems)
                   BottomNavigationBarItem(icon: Icon(icon), label: label),
               ],
             )
           : null,
+    );
+  }
+}
+
+class DashboardScreen extends StatelessWidget {
+  const DashboardScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return _TabScaffold(
+      selectedIndex: 0,
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'new-upload',
+        onPressed: () => _switchTab(context, 2),
+        tooltip: 'New upload',
+        child: const Icon(Icons.add_rounded, size: 28),
+      ),
+      body: _DashboardContent(
+        size: context.screenSize,
+        onSeeAll: () => _switchTab(context, 1),
+        onAvatarTap: () => _switchTab(context, 3),
+        onAdminTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const AdminAccountsScreen()),
+        ),
+      ),
     );
   }
 }
@@ -622,7 +644,11 @@ class _TipCard extends StatelessWidget {
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
-              children: [icon, const SizedBox(height: AppSpacing.md), message],
+              children: [
+                icon,
+                const SizedBox(height: AppSpacing.md),
+                message,
+              ],
             )
           : Row(
               children: [
