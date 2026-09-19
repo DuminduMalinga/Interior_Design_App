@@ -8,6 +8,7 @@ import 'app_theme.dart';
 import 'responsive.dart';
 
 part 'dashboard.dart';
+part 'projects.dart';
 part 'upload.dart';
 part 'processing.dart';
 part 'room_selection.dart';
@@ -26,7 +27,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Planly AI',
+      title: 'LiviSpace',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme(),
       home: const WelcomeScreen(),
