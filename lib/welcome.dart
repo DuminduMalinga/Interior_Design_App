@@ -1,8 +1,5 @@
 part of 'main.dart';
 
-/// Cool cyan-blue used across the hero illustration's status badges.
-const _heroCyan = Color(0xFF5EC8F2);
-
 /// The app's landing screen — first thing a new user sees before signing up
 /// or jumping into the dashboard.
 class WelcomeScreen extends StatefulWidget {
@@ -33,129 +30,144 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+    final text = context.text;
+    final wide = !context.screenSize.isMobile;
+
+    final headline = _Headline(centered: !wide);
+    final description = Text(
+      'AI-powered room detection turns 2D architectural '
+      'blueprints into photorealistic, interactive 3D '
+      'environments in seconds.',
+      textAlign: wide ? TextAlign.start : TextAlign.center,
+      style: text.bodyMedium?.copyWith(color: c.textSecondary),
+    );
+    final hero = AnimatedBuilder(
+      animation: _floatController,
+      builder: (context, child) {
+        final dy = math.sin(_floatController.value * math.pi) * 6;
+        return Transform.translate(offset: Offset(0, -dy), child: child);
+      },
+      child: const _HeroCard(),
+    );
+    const stats = Row(
+      children: [
+        Expanded(
+          child: _StatTile(
+            icon: Icons.check_circle_outline_rounded,
+            value: '98%',
+            label: 'Boundary Accuracy',
+            accent: _StatAccent.primary,
+          ),
+        ),
+        SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: _StatTile(
+            icon: Icons.bolt_rounded,
+            value: '15s',
+            label: 'AI 3D Synthesis',
+            accent: _StatAccent.secondary,
+          ),
+        ),
+      ],
+    );
+    final note = Text(
+      'No credit card required • Instant 3D CAD analysis',
+      textAlign: wide ? TextAlign.start : TextAlign.center,
+      style: text.labelSmall?.copyWith(color: c.textMuted),
+    );
+
     return Scaffold(
-      backgroundColor: _background,
       body: Stack(
         children: [
           const Positioned.fill(child: _WelcomeBackground()),
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(22, 14, 22, 22),
+            child: AppContentFrame(
+              verticalPadding: AppSpacing.lg,
               child: Column(
                 children: [
                   _WelcomeTopBar(onSignIn: () => _openAuth(context, true)),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: AppSpacing.lg),
                   Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        children: [
-                          const _StatusPill(),
-                          const SizedBox(height: 18),
-                          const _Headline(),
-                          const SizedBox(height: 11),
-                          const Text(
-                            'AI-powered room detection turns 2D architectural '
-                            'blueprints into photorealistic, interactive 3D '
-                            'environments in seconds.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: _muted,
-                              fontSize: 12.5,
-                              height: 1.5,
-                            ),
-                          ),
-                          const SizedBox(height: 22),
-                          AnimatedBuilder(
-                            animation: _floatController,
-                            builder: (context, child) {
-                              final dy =
-                                  math.sin(_floatController.value * math.pi) *
-                                  6;
-                              return Transform.translate(
-                                offset: Offset(0, -dy),
-                                child: child,
-                              );
-                            },
-                            child: const _HeroCard(),
-                          ),
-                          const SizedBox(height: 20),
-                          const Row(
-                            children: [
-                              Expanded(
-                                child: _StatTile(
-                                  icon: Icons.check_circle_outline_rounded,
-                                  value: '98%',
-                                  label: 'Boundary Accuracy',
-                                  accent: _blue,
-                                ),
-                              ),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: _StatTile(
-                                  icon: Icons.bolt_rounded,
-                                  value: '15s',
-                                  label: 'AI 3D Synthesis',
-                                  accent: _violet,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [_blue, _violet],
-                        ),
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _blue.withValues(alpha: .45),
-                            blurRadius: 34,
-                            spreadRadius: 1,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: ElevatedButton(
-                        onPressed: () => _openAuth(context, false),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          foregroundColor: Colors.white,
-                          shadowColor: Colors.transparent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Get Started',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
+                    child: wide
+                        ? Center(
+                            child: SingleChildScrollView(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const _StatusPill(),
+                                        const SizedBox(height: AppSpacing.lg),
+                                        headline,
+                                        const SizedBox(height: AppSpacing.md),
+                                        description,
+                                        const SizedBox(height: AppSpacing.xl),
+                                        Wrap(
+                                          spacing: AppSpacing.md,
+                                          runSpacing: AppSpacing.md,
+                                          children: [
+                                            AppButton(
+                                              label: 'Get Started',
+                                              icon: Icons.arrow_forward_rounded,
+                                              iconAfterLabel: true,
+                                              expanded: false,
+                                              onPressed: () =>
+                                                  _openAuth(context, false),
+                                            ),
+                                            AppButton(
+                                              label: 'Sign In',
+                                              variant:
+                                                  AppButtonVariant.secondary,
+                                              expanded: false,
+                                              onPressed: () =>
+                                                  _openAuth(context, true),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: AppSpacing.md),
+                                        note,
+                                        const SizedBox(height: AppSpacing.xl),
+                                        stats,
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.huge),
+                                  Expanded(child: hero),
+                                ],
                               ),
                             ),
-                            SizedBox(width: 8),
-                            Icon(Icons.arrow_forward_rounded, size: 19),
-                          ],
-                        ),
-                      ),
+                          )
+                        : SingleChildScrollView(
+                            child: Column(
+                              children: [
+                                const _StatusPill(),
+                                const SizedBox(height: AppSpacing.lg),
+                                headline,
+                                const SizedBox(height: AppSpacing.md),
+                                description,
+                                const SizedBox(height: AppSpacing.xl),
+                                hero,
+                                const SizedBox(height: AppSpacing.xl),
+                                stats,
+                              ],
+                            ),
+                          ),
+                  ),
+                  if (!wide) ...[
+                    const SizedBox(height: AppSpacing.lg),
+                    AppButton(
+                      label: 'Get Started',
+                      icon: Icons.arrow_forward_rounded,
+                      iconAfterLabel: true,
+                      onPressed: () => _openAuth(context, false),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'No credit card required • Instant 3D CAD analysis',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: _muted, fontSize: 10.5),
-                  ),
+                    const SizedBox(height: AppSpacing.md),
+                    note,
+                  ],
                 ],
               ),
             ),
@@ -182,70 +194,41 @@ class _WelcomeTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+    final text = context.text;
+
     return Row(
       children: [
-        Container(
-          width: 32,
-          height: 32,
+        DecoratedBox(
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [_blue, _violet],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(10),
+            gradient: c.brandGradient,
+            borderRadius: AppRadius.smAll,
           ),
-          child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 18),
+          child: SizedBox.square(
+            dimension: 36,
+            child: Icon(Icons.bolt_rounded, color: c.onPrimary, size: 20),
+          ),
         ),
-        const SizedBox(width: 9),
-        const Text.rich(
+        const SizedBox(width: AppSpacing.sm + 1),
+        Text.rich(
           TextSpan(
+            style: text.titleMedium,
             children: [
-              TextSpan(
-                text: 'Planly ',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
-              ),
+              const TextSpan(text: 'Planly '),
               TextSpan(
                 text: 'AI',
-                style: TextStyle(
-                  color: _blue,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 15,
-                ),
+                style: text.titleMedium?.copyWith(color: c.primary),
               ),
             ],
           ),
         ),
-        const SizedBox(width: 7),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: _violet.withValues(alpha: .16),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: _violet.withValues(alpha: .4)),
-          ),
-          child: const Text(
-            'AI 3D',
-            style: TextStyle(
-              color: Color(0xFFC9B8FF),
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
+        const SizedBox(width: AppSpacing.sm),
+        AppStatusChip(label: 'AI 3D', color: c.secondary),
         const Spacer(),
         TextButton(
           onPressed: onSignIn,
-          style: TextButton.styleFrom(
-            foregroundColor: Colors.white,
-            padding: EdgeInsets.zero,
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: const Text(
-            'Sign In',
-            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-          ),
+          style: TextButton.styleFrom(foregroundColor: c.textPrimary),
+          child: const Text('Sign In'),
         ),
       ],
     );
@@ -257,70 +240,57 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: _blue.withValues(alpha: .12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _blue.withValues(alpha: .32)),
-      ),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.hub_rounded, color: Color(0xFF83B9FF), size: 13),
-            SizedBox(width: 6),
-            Text(
-              'Next-Gen Spatial Intelligence',
-              style: TextStyle(
-                color: Color(0xFFB9D5FF),
-                fontSize: 10.5,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return const AppStatusChip(
+      label: 'Next-Gen Spatial Intelligence',
+      status: AppStatus.info,
+      icon: Icons.hub_rounded,
     );
   }
 }
 
 class _Headline extends StatelessWidget {
-  const _Headline();
+  const _Headline({required this.centered});
+
+  final bool centered;
 
   @override
   Widget build(BuildContext context) {
+    final style = context.responsive(
+      mobile: context.text.headlineMedium,
+      tablet: context.text.displayMedium,
+      desktop: context.text.displayLarge,
+    );
+    final align = centered ? TextAlign.center : TextAlign.start;
+
     return Column(
+      crossAxisAlignment:
+          centered ? CrossAxisAlignment.center : CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Transform Floor Plans into',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 25,
-            height: 1.18,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -.5,
-          ),
-        ),
+        Text('Transform Floor Plans into', textAlign: align, style: style),
         ShaderMask(
-          shaderCallback: (bounds) => const LinearGradient(
-            colors: [_blue, _violet],
-          ).createShader(bounds),
-          child: const Text(
+          shaderCallback: (bounds) =>
+              context.colors.brandGradient.createShader(bounds),
+          // The text colour is replaced by the gradient; it only has to be
+          // opaque for the mask to show through.
+          child: Text(
             'Stunning 3D Spaces',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 25,
-              height: 1.18,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -.5,
-              color: Colors.white,
-            ),
+            textAlign: align,
+            style: style?.copyWith(color: Colors.white),
           ),
         ),
       ],
     );
   }
+}
+
+enum _StatAccent {
+  primary,
+  secondary;
+
+  Color resolve(AppColors c) => switch (this) {
+    primary => c.primary,
+    secondary => c.secondary,
+  };
 }
 
 class _StatTile extends StatelessWidget {
@@ -334,46 +304,39 @@ class _StatTile extends StatelessWidget {
   final IconData icon;
   final String value;
   final String label;
-  final Color accent;
+  final _StatAccent accent;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: accent.withValues(alpha: .22)),
-      ),
+    final c = context.colors;
+    final text = context.text;
+    final color = accent.resolve(c);
+
+    return AppCard(
+      borderColor: color.withValues(alpha: 0.22),
       child: Row(
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
+          DecoratedBox(
             decoration: BoxDecoration(
-              color: accent.withValues(alpha: .16),
-              borderRadius: BorderRadius.circular(10),
+              color: color.withValues(alpha: 0.16),
+              borderRadius: AppRadius.smAll,
             ),
-            child: Icon(icon, color: accent, size: 17),
+            child: SizedBox.square(
+              dimension: 36,
+              child: Icon(icon, color: color, size: 18),
+            ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+                Text(value, style: text.titleMedium),
                 Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: _muted, fontSize: 9.5),
+                  style: text.labelSmall?.copyWith(color: c.textMuted),
                 ),
               ],
             ),
@@ -391,27 +354,29 @@ class _HeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+
     return AspectRatio(
       aspectRatio: 1.12,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Positioned.fill(
-            child: Container(
+            child: DecoratedBox(
               decoration: BoxDecoration(
-                color: const Color(0xFF0C1220),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: _blue.withValues(alpha: .22)),
+                color: c.backgroundElevated,
+                borderRadius: AppRadius.xlAll,
+                border: Border.all(color: c.primary.withValues(alpha: 0.22)),
                 boxShadow: [
                   BoxShadow(
-                    color: _blue.withValues(alpha: .12),
+                    color: c.primary.withValues(alpha: 0.12),
                     blurRadius: 40,
                     spreadRadius: 2,
                   ),
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(23),
+                borderRadius: AppRadius.xlAll,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -420,18 +385,17 @@ class _HeroCard extends StatelessWidget {
                       '?auto=format&fit=crop&w=1000&q=80',
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) =>
-                          CustomPaint(painter: _WelcomeHeroPainter()),
+                          CustomPaint(painter: _WelcomeHeroPainter(colors: c)),
                       loadingBuilder: (context, child, progress) {
                         if (progress == null) return child;
-                        return const ColoredBox(
-                          color: Color(0xFF0C1220),
+                        return ColoredBox(
+                          color: c.backgroundElevated,
                           child: Center(
-                            child: SizedBox(
-                              width: 26,
-                              height: 26,
+                            child: SizedBox.square(
+                              dimension: 26,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.4,
-                                color: _blue,
+                                color: c.primary,
                               ),
                             ),
                           ),
@@ -443,10 +407,7 @@ class _HeroCard extends StatelessWidget {
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.black.withValues(alpha: .05),
-                            Colors.black.withValues(alpha: .5),
-                          ],
+                          colors: [Colors.transparent, c.scrim],
                           stops: const [.5, 1],
                         ),
                       ),
@@ -457,21 +418,19 @@ class _HeroCard extends StatelessWidget {
             ),
           ),
           const Positioned(
-            top: 8,
-            left: 8,
+            top: AppSpacing.sm,
+            left: AppSpacing.sm,
             child: _HeroBadge(
               icon: Icons.diamond_outlined,
               label: '3D Mesh: Detected',
-              color: _heroCyan,
             ),
           ),
           const Positioned(
-            top: 8,
-            right: 8,
+            top: AppSpacing.sm,
+            right: AppSpacing.sm,
             child: _HeroBadge(
               icon: Icons.auto_awesome_rounded,
               label: '60 FPS ISOMETRIC',
-              color: _heroCyan,
             ),
           ),
           const Positioned(
@@ -482,7 +441,6 @@ class _HeroCard extends StatelessWidget {
               child: _HeroBadge(
                 icon: Icons.layers_outlined,
                 label: 'Neural Spatial Engine',
-                color: _heroCyan,
               ),
             ),
           ),
@@ -493,46 +451,30 @@ class _HeroCard extends StatelessWidget {
 }
 
 class _HeroBadge extends StatelessWidget {
-  const _HeroBadge({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
+  const _HeroBadge({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
-  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+    final c = context.colors;
+
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xE60D111D),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: .5)),
+        color: c.backgroundElevated.withValues(alpha: 0.9),
+        borderRadius: AppRadius.fullAll,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 11),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 8.5,
-              fontWeight: FontWeight.w800,
-              letterSpacing: .2,
-            ),
-          ),
-        ],
-      ),
+      child: AppStatusChip(label: label, icon: icon, color: c.accent),
     );
   }
 }
 
 class _WelcomeHeroPainter extends CustomPainter {
+  const _WelcomeHeroPainter({required this.colors});
+
+  final AppColors colors;
+
   static const _yaw = -.42;
 
   Offset _project(double x, double y, double z, Size size) {
@@ -581,9 +523,10 @@ class _WelcomeHeroPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     const w = 200.0, d = 200.0, h = 110.0;
+    final c = colors;
 
     final glow = Paint()
-      ..color = _blue.withValues(alpha: .18)
+      ..color = c.primary.withValues(alpha: .18)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 40);
     canvas.drawCircle(
       Offset(size.width / 2, size.height * .62),
@@ -597,10 +540,10 @@ class _WelcomeHeroPainter extends CustomPainter {
       _project(w, d, 0, size),
       _project(0, d, 0, size),
     ];
-    _quad(canvas, floor, Paint()..color = const Color(0xFF141B29));
+    _quad(canvas, floor, Paint()..color = c.surface);
 
     final grid = Paint()
-      ..color = Colors.white.withValues(alpha: .05)
+      ..color = c.glassFill
       ..strokeWidth = 1;
     for (var i = 1; i < 5; i++) {
       final t = i / 5 * w;
@@ -608,7 +551,7 @@ class _WelcomeHeroPainter extends CustomPainter {
       canvas.drawLine(_project(0, t, 0, size), _project(w, t, 0, size), grid);
     }
 
-    final wallPaint = Paint()..color = _blue.withValues(alpha: .08);
+    final wallPaint = Paint()..color = c.primary.withValues(alpha: .08);
     _quad(canvas, [
       _project(0, 0, 0, size),
       _project(0, d, 0, size),
@@ -641,8 +584,8 @@ class _WelcomeHeroPainter extends CustomPainter {
       canvas,
       screenPts,
       Paint()
-        ..shader = const LinearGradient(
-          colors: [_blue, _violet],
+        ..shader = LinearGradient(
+          colors: [c.primary, c.secondary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ).createShader(screenBounds)
@@ -652,7 +595,7 @@ class _WelcomeHeroPainter extends CustomPainter {
       canvas,
       screenPts,
       Paint()
-        ..color = _heroCyan.withValues(alpha: .6)
+        ..color = c.accent.withValues(alpha: .6)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.2,
     );
@@ -663,13 +606,13 @@ class _WelcomeHeroPainter extends CustomPainter {
       _project(w * .84, d * .84, .3, size),
       _project(w * .16, d * .84, .3, size),
     ];
-    _quad(canvas, rug, Paint()..color = _violet.withValues(alpha: .10));
+    _quad(canvas, rug, Paint()..color = c.secondary.withValues(alpha: .10));
 
     _drawScanRing(canvas, size, 55, 42, 42);
 
-    _box(canvas, size, 18, 22, 92, 62, 34, _blue);
-    _box(canvas, size, 118, 28, 178, 96, 46, _violet);
-    _box(canvas, size, 28, 128, 100, 176, 26, const Color(0xFF35C5B5));
+    _box(canvas, size, 18, 22, 92, 62, 34, c.primary);
+    _box(canvas, size, 118, 28, 178, 96, 46, c.secondary);
+    _box(canvas, size, 28, 128, 100, 176, 26, c.accent);
 
     _drawFloorLamp(canvas, size, 172, 148);
   }
@@ -684,7 +627,7 @@ class _WelcomeHeroPainter extends CustomPainter {
     double radius,
   ) {
     final paint = Paint()
-      ..color = _heroCyan.withValues(alpha: .5)
+      ..color = colors.accent.withValues(alpha: .5)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.1;
     const segments = 48;
@@ -710,7 +653,7 @@ class _WelcomeHeroPainter extends CustomPainter {
     final bulb = _project(x - 26, y - 8, 68, size);
     final control = _project(x - 4, y - 4, 62, size);
     final stem = Paint()
-      ..color = Colors.white.withValues(alpha: .5)
+      ..color = colors.textPrimary.withValues(alpha: .5)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.4;
     canvas.drawPath(
@@ -723,14 +666,15 @@ class _WelcomeHeroPainter extends CustomPainter {
       bulb,
       6,
       Paint()
-        ..color = Colors.white.withValues(alpha: .18)
+        ..color = colors.textPrimary.withValues(alpha: .18)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
     );
-    canvas.drawCircle(bulb, 3, Paint()..color = Colors.white);
+    canvas.drawCircle(bulb, 3, Paint()..color = colors.textPrimary);
   }
 
   @override
-  bool shouldRepaint(covariant _WelcomeHeroPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _WelcomeHeroPainter oldDelegate) =>
+      oldDelegate.colors != colors;
 }
 
 class _WelcomeBackground extends StatelessWidget {
@@ -738,20 +682,25 @@ class _WelcomeBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+
     return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: RadialGradient(
-          center: const Alignment(-.7, -1),
-          radius: 1.15,
-          colors: [_violet.withValues(alpha: .18), Colors.transparent],
-        ),
-      ),
+      decoration: BoxDecoration(gradient: c.backgroundGradient),
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: RadialGradient(
-            center: const Alignment(.9, .9),
-            radius: 1.2,
-            colors: [_blue.withValues(alpha: .16), Colors.transparent],
+            center: const Alignment(-.7, -1),
+            radius: 1.15,
+            colors: [c.secondary.withValues(alpha: 0.18), Colors.transparent],
+          ),
+        ),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: const Alignment(.9, .9),
+              radius: 1.2,
+              colors: [c.primary.withValues(alpha: 0.16), Colors.transparent],
+            ),
           ),
         ),
       ),

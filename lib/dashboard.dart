@@ -1,5 +1,12 @@
 part of 'main.dart';
 
+const _navItems = [
+  (Icons.home_rounded, 'Home'),
+  (Icons.grid_view_rounded, 'Projects'),
+  (Icons.cloud_upload_outlined, 'Upload'),
+  (Icons.person_outline_rounded, 'Profile'),
+];
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -10,169 +17,273 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedTab = 0;
 
+  // Upload and Profile open their own screens; the other tabs just highlight.
+  void _select(int index) {
+    switch (index) {
+      case 2:
+        _open(const UploadScreen());
+      case 3:
+        _open(const ProfileScreen());
+      default:
+        setState(() => _selectedTab = index);
+    }
+  }
+
+  void _open(Widget screen) {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen));
+  }
+
   @override
   Widget build(BuildContext context) {
+    final size = context.screenSize;
+    final content = _DashboardContent(
+      size: size,
+      onSeeAll: () => _select(1),
+      onAvatarTap: () => _open(const ProfileScreen()),
+      onAdminTap: () => _open(const AdminAccountsScreen()),
+    );
+
     return Scaffold(
-      body: SafeArea(
-        child: Stack(
+      body: DecoratedBox(
+        decoration: BoxDecoration(gradient: context.colors.backgroundGradient),
+        child: SafeArea(
+          child: size.isMobile
+              ? content
+              : Row(
+                  children: [
+                    _SideNav(
+                      extended: size.isDesktop,
+                      selectedIndex: _selectedTab,
+                      onSelected: _select,
+                    ),
+                    Expanded(child: content),
+                  ],
+                ),
+        ),
+      ),
+      floatingActionButton: size.isMobile
+          ? FloatingActionButton(
+              heroTag: 'new-upload',
+              onPressed: () => _open(const UploadScreen()),
+              tooltip: 'New upload',
+              child: const Icon(Icons.add_rounded, size: 28),
+            )
+          : null,
+      bottomNavigationBar: size.isMobile
+          ? BottomNavigationBar(
+              currentIndex: _selectedTab,
+              onTap: _select,
+              items: [
+                for (final (icon, label) in _navItems)
+                  BottomNavigationBarItem(icon: Icon(icon), label: label),
+              ],
+            )
+          : null,
+    );
+  }
+}
+
+class _DashboardContent extends StatelessWidget {
+  const _DashboardContent({
+    required this.size,
+    required this.onSeeAll,
+    required this.onAvatarTap,
+    required this.onAdminTap,
+  });
+
+  final ScreenSize size;
+  final VoidCallback onSeeAll;
+  final VoidCallback onAvatarTap;
+  final VoidCallback onAdminTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const hero = _HeroBanner();
+
+    return SingleChildScrollView(
+      child: AppContentFrame(
+        // Keeps the last row clear of the mobile floating action button.
+        bottomInset: size.isMobile ? 72 : 0,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 22, 20, 120),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _Header(
-                    onNotificationTap: () {},
-                    onAdminTap: () => _openAdmin(context),
-                    onAvatarTap: () => _openProfile(context),
-                  ),
-                  const SizedBox(height: 28),
-                  const _HeroBanner(),
-                  const SizedBox(height: 28),
-                  _SectionHeader(
-                    title: 'Recent Projects',
-                    action: 'See all',
-                    onTap: () => setState(() => _selectedTab = 1),
-                  ),
-                  const SizedBox(height: 14),
-                  const _ProjectGrid(),
-                  const SizedBox(height: 26),
-                  const _TipCard(),
-                ],
-              ),
+            _Header(onAvatarTap: onAvatarTap, onAdminTap: onAdminTap),
+            const SizedBox(height: AppSpacing.xxl),
+            if (size.isDesktop)
+              const IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(flex: 5, child: hero),
+                    SizedBox(width: AppSpacing.xl),
+                    Expanded(flex: 2, child: _TipCard(vertical: true)),
+                  ],
+                ),
+              )
+            else
+              hero,
+            const SizedBox(height: AppSpacing.xxl),
+            AppSectionHeader(
+              title: 'Recent Projects',
+              actionLabel: 'See all',
+              onAction: onSeeAll,
             ),
-            Positioned(
-              right: 20,
-              bottom: 86,
-              child: FloatingActionButton(
-                heroTag: 'new-upload',
-                onPressed: () => _openUpload(context),
-                tooltip: 'New upload',
-                backgroundColor: _blue,
-                foregroundColor: Colors.white,
-                elevation: 8,
-                child: const Icon(Icons.add_rounded, size: 28),
-              ),
-            ),
+            const SizedBox(height: AppSpacing.lg),
+            const _ProjectGrid(),
+            if (!size.isDesktop) ...[
+              const SizedBox(height: AppSpacing.xxl),
+              const _TipCard(),
+            ],
           ],
         ),
       ),
-      bottomNavigationBar: _BottomNav(
-        selectedIndex: _selectedTab,
-        onSelected: (index) {
-          if (index == 2) {
-            _openUpload(context);
-          } else if (index == 3) {
-            _openProfile(context);
-          } else {
-            setState(() => _selectedTab = index);
-          }
-        },
+    );
+  }
+}
+
+class _SideNav extends StatelessWidget {
+  const _SideNav({
+    required this.extended,
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  final bool extended;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: c.backgroundElevated,
+        border: Border(right: BorderSide(color: c.border)),
+      ),
+      child: NavigationRail(
+        extended: extended,
+        selectedIndex: selectedIndex,
+        onDestinationSelected: onSelected,
+        labelType: extended
+            ? NavigationRailLabelType.none
+            : NavigationRailLabelType.all,
+        leading: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: c.brandGradient,
+                  borderRadius: AppRadius.smAll,
+                  boxShadow: AppShadows.glow(c.primary),
+                ),
+                child: SizedBox.square(
+                  dimension: 40,
+                  child: Icon(Icons.home_work_rounded, color: c.onPrimary),
+                ),
+              ),
+              if (extended) ...[
+                const SizedBox(width: AppSpacing.md),
+                Text('Planly AI', style: context.text.titleLarge),
+              ],
+            ],
+          ),
+        ),
+        destinations: [
+          for (final (icon, label) in _navItems)
+            NavigationRailDestination(icon: Icon(icon), label: Text(label)),
+        ],
       ),
     );
-  }
-
-  void _openUpload(BuildContext context) {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const UploadScreen()));
-  }
-
-  void _openAdmin(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const AdminAccountsScreen()),
-    );
-  }
-
-  void _openProfile(BuildContext context) {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const ProfileScreen()));
   }
 }
 
 class _Header extends StatelessWidget {
-  const _Header({
-    required this.onNotificationTap,
-    required this.onAdminTap,
-    required this.onAvatarTap,
-  });
+  const _Header({required this.onAvatarTap, required this.onAdminTap});
 
-  final VoidCallback onNotificationTap;
-  final VoidCallback onAdminTap;
   final VoidCallback onAvatarTap;
+  final VoidCallback onAdminTap;
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+    final text = context.text;
+
+    IconButton actionButton({
+      required IconData icon,
+      required String tooltip,
+      required VoidCallback onPressed,
+    }) {
+      return IconButton(
+        onPressed: onPressed,
+        tooltip: tooltip,
+        style: IconButton.styleFrom(
+          backgroundColor: c.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppRadius.mdAll,
+            side: BorderSide(color: c.border),
+          ),
+        ),
+        icon: Icon(icon, size: 22, color: c.textPrimary),
+      );
+    }
+
     return Row(
       children: [
-        InkWell(
-          onTap: onAvatarTap,
-          borderRadius: BorderRadius.circular(22),
-          child: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [_violet, _blue],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+        Tooltip(
+          message: 'Profile',
+          child: InkWell(
+            onTap: onAvatarTap,
+            customBorder: const CircleBorder(),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: c.brandGradient,
+                border: Border.all(color: c.glassBorder, width: 1.5),
               ),
-              border: Border.all(color: Colors.white24, width: 2),
-            ),
-            child: const Center(
-              child: Text(
-                'JM',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+              child: SizedBox.square(
+                dimension: 48,
+                child: Center(
+                  child: Text(
+                    'JM',
+                    style: text.labelLarge?.copyWith(color: c.onPrimary),
+                  ),
+                ),
               ),
             ),
           ),
         ),
-        const SizedBox(width: 12),
-        const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Good morning, Jamie',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Good morning, Jamie',
+                style: context.responsive(
+                  mobile: text.titleMedium,
+                  tablet: text.titleLarge,
+                ),
               ),
-            ),
-            SizedBox(height: 3),
-            Text(
-              'Ready to design something great?',
-              style: TextStyle(color: _muted, fontSize: 12),
-            ),
-          ],
+              Text(
+                'Ready to design something great?',
+                style: text.bodySmall?.copyWith(color: c.textMuted),
+              ),
+            ],
+          ),
         ),
-        const Spacer(),
-        IconButton(
-          onPressed: onAdminTap,
+        actionButton(
+          icon: Icons.admin_panel_settings_outlined,
           tooltip: 'Manage accounts',
-          style: IconButton.styleFrom(
-            backgroundColor: _surface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: Colors.white10),
-            ),
-          ),
-          icon: const Icon(Icons.admin_panel_settings_outlined, size: 20),
+          onPressed: onAdminTap,
         ),
-        const SizedBox(width: 10),
-        IconButton(
-          onPressed: onNotificationTap,
+        const SizedBox(width: AppSpacing.sm),
+        actionButton(
+          icon: Icons.notifications_none_rounded,
           tooltip: 'Notifications',
-          style: IconButton.styleFrom(
-            backgroundColor: _surface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: Colors.white10),
-            ),
-          ),
-          icon: const Icon(Icons.notifications_none_rounded, size: 21),
+          onPressed: () {},
         ),
       ],
     );
@@ -184,112 +295,97 @@ class _HeroBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 164,
-      width: double.infinity,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF182A58), Color(0xFF171A3D), Color(0xFF171328)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(color: _blue.withValues(alpha: .25)),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -28,
-            top: -42,
-            child: Container(
-              width: 170,
-              height: 170,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _violet.withValues(alpha: .16),
-                boxShadow: [
-                  BoxShadow(
-                    color: _blue.withValues(alpha: .2),
-                    blurRadius: 55,
-                    spreadRadius: 12,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const Positioned(
-            left: 20,
-            top: 20,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _AiPill(),
-                SizedBox(height: 13),
-                Text(
-                  'Turn sketches into\nsmart floor plans.',
-                  style: TextStyle(
-                    fontSize: 22,
-                    height: 1.1,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -.5,
-                  ),
-                ),
-                SizedBox(height: 9),
-                Text(
-                  'Upload an image and let AI do the work.',
-                  style: TextStyle(color: Color(0xFFB8C6EE), fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            right: 23,
-            bottom: 16,
-            child: Transform.rotate(
-              angle: -.08,
-              child: const SizedBox(
-                width: 86,
-                height: 100,
-                child: CustomPaint(painter: _PlanPainter()),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+    final c = context.colors;
+    final text = context.text;
+    final isMobile = context.screenSize.isMobile;
 
-class _AiPill extends StatelessWidget {
-  const _AiPill();
-
-  @override
-  Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: _blue.withValues(alpha: .18),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _blue.withValues(alpha: .35)),
+        borderRadius: AppRadius.xlAll,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [c.surfaceElevated, c.backgroundElevated, c.background],
+        ),
+        border: Border.all(color: c.primary.withValues(alpha: 0.25)),
+        boxShadow: AppShadows.medium,
       ),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+      child: ClipRRect(
+        borderRadius: AppRadius.xlAll,
+        child: Stack(
           children: [
-            Icon(
-              Icons.auto_awesome_rounded,
-              color: Color(0xFF83B9FF),
-              size: 13,
+            Positioned(
+              right: -40,
+              top: -60,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      c.secondary.withValues(alpha: 0.35),
+                      c.primary.withValues(alpha: 0),
+                    ],
+                  ),
+                ),
+                child: const SizedBox.square(dimension: 260),
+              ),
             ),
-            SizedBox(width: 5),
-            Text(
-              'POWERED BY AI',
-              style: TextStyle(
-                color: Color(0xFFB9D5FF),
-                fontSize: 9,
-                fontWeight: FontWeight.w800,
-                letterSpacing: .6,
+            Positioned(
+              right: AppSpacing.xl,
+              bottom: AppSpacing.xl,
+              child: Transform.rotate(
+                angle: -0.08,
+                child: SizedBox(
+                  width: isMobile ? 84 : 140,
+                  height: isMobile ? 100 : 168,
+                  child: CustomPaint(
+                    painter: _PlanPainter(
+                      accent: c.accent,
+                      lineColor: c.textPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            ConstrainedBox(
+              constraints: BoxConstraints(minHeight: isMobile ? 176 : 232),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.xl,
+                  isMobile ? 116 : 200,
+                  AppSpacing.xl,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const _AiPill(),
+                    const SizedBox(height: AppSpacing.lg),
+                    Text(
+                      'Turn sketches into smart floor plans.',
+                      style: context.responsive(
+                        mobile: text.titleLarge,
+                        tablet: text.headlineMedium,
+                        desktop: text.headlineLarge,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      'Upload an image and let AI do the work.',
+                      style: text.bodyMedium?.copyWith(color: c.textSecondary),
+                    ),
+                    if (!isMobile) ...[
+                      const SizedBox(height: AppSpacing.xl),
+                      AppButton(
+                        label: 'Upload floor plan',
+                        icon: Icons.cloud_upload_outlined,
+                        expanded: false,
+                        onPressed: () {},
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ],
@@ -299,134 +395,110 @@ class _AiPill extends StatelessWidget {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    required this.action,
-    required this.onTap,
-  });
-
-  final String title;
-  final String action;
-  final VoidCallback onTap;
+/// Shared with the room selection screen, which is why it lives at library
+/// level instead of inside the hero.
+class _AiPill extends StatelessWidget {
+  const _AiPill();
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(
-          title,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-        ),
-        const Spacer(),
-        TextButton(
-          onPressed: onTap,
-          style: TextButton.styleFrom(
-            foregroundColor: _blue,
-            padding: EdgeInsets.zero,
-            minimumSize: Size.zero,
-          ),
-          child: Text(
-            action,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-          ),
-        ),
-      ],
+    return const AppStatusChip(
+      label: 'Powered by AI',
+      status: AppStatus.info,
+      icon: Icons.auto_awesome_rounded,
     );
   }
 }
 
-class _ProjectGrid extends StatelessWidget {
-  const _ProjectGrid();
-
-  static const projects = [
-    (
-      'Loft Apartment',
-      'Just now',
-      _blue,
-      'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=900&q=85',
-    ),
-    (
-      'Coastal Retreat',
-      'Yesterday',
-      Color(0xFF35C5B5),
-      'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=900&q=85',
-    ),
-    (
-      'Studio Workspace',
-      'Aug 24, 2024',
-      _violet,
-      'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=85',
-    ),
-    (
-      'Family Residence',
-      'Aug 18, 2024',
-      Color(0xFFE29C61),
-      'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=900&q=85',
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: projects.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: .91,
-      ),
-      itemBuilder: (context, index) {
-        final project = projects[index];
-        return _ProjectCard(
-          title: project.$1,
-          date: project.$2,
-          accent: project.$3,
-          imageUrl: project.$4,
-          planIndex: index,
-        );
-      },
-    );
-  }
-}
-
-class _ProjectCard extends StatelessWidget {
-  const _ProjectCard({
-    required this.title,
-    required this.date,
-    required this.accent,
-    required this.imageUrl,
-    required this.planIndex,
-  });
+class _Project {
+  const _Project(this.title, this.date, this.accent, this.imageUrl);
 
   final String title;
   final String date;
   final Color accent;
   final String imageUrl;
+}
+
+class _ProjectGrid extends StatelessWidget {
+  const _ProjectGrid();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final projects = [
+      _Project(
+        'Loft Apartment',
+        'Just now',
+        c.primary,
+        'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=900&q=85',
+      ),
+      _Project(
+        'Coastal Retreat',
+        'Yesterday',
+        c.accent,
+        'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=900&q=85',
+      ),
+      _Project(
+        'Studio Workspace',
+        'Aug 24, 2024',
+        c.secondary,
+        'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=85',
+      ),
+      _Project(
+        'Family Residence',
+        'Aug 18, 2024',
+        c.warning,
+        'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=900&q=85',
+      ),
+    ];
+
+    return AppResponsiveGrid(
+      mobileColumns: 2,
+      tabletColumns: 3,
+      desktopColumns: 4,
+      childAspectRatio: context.responsive(
+        mobile: 0.88,
+        tablet: 1.0,
+        desktop: 1.1,
+      ),
+      children: [
+        for (final (index, project) in projects.indexed)
+          _ProjectCard(project: project, planIndex: index),
+      ],
+    );
+  }
+}
+
+class _ProjectCard extends StatelessWidget {
+  const _ProjectCard({required this.project, required this.planIndex});
+
+  final _Project project;
   final int planIndex;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: .07)),
-      ),
+    final c = context.colors;
+    final text = context.text;
+
+    return AppCard(
+      padding: EdgeInsets.zero,
+      onTap: () {},
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: AppRadius.lgAll,
         child: Stack(
           fit: StackFit.expand,
           children: [
             Image.network(
-              imageUrl,
+              project.imageUrl,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => ColoredBox(
-                color: const Color(0xFF1B2230),
+                color: c.surfaceElevated,
                 child: CustomPaint(
-                  painter: _PlanPainter(accent: accent, variant: planIndex),
+                  painter: _PlanPainter(
+                    accent: project.accent,
+                    lineColor: c.textPrimary,
+                    variant: planIndex,
+                  ),
                 ),
               ),
             ),
@@ -435,57 +507,65 @@ class _ProjectCard extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: .08),
-                    Colors.black.withValues(alpha: .88),
-                  ],
-                  stops: const [.35, .52, 1],
+                  colors: [Colors.transparent, c.scrim],
+                  stops: const [0.4, 1],
                 ),
               ),
             ),
             Positioned(
-              left: 12,
-              right: 10,
-              bottom: 11,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
+              left: AppSpacing.sm,
+              right: AppSpacing.sm,
+              bottom: AppSpacing.sm,
+              child: AppCard(
+                glass: true,
+                radius: AppRadius.smAll,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            project.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: text.titleSmall,
+                          ),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.schedule_rounded,
+                                size: 12,
+                                color: c.textSecondary,
+                              ),
+                              const SizedBox(width: AppSpacing.xs),
+                              Flexible(
+                                child: Text(
+                                  project.date,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: text.labelSmall?.copyWith(
+                                    color: c.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.schedule_rounded,
-                        color: Color(0xFFD1D7E5),
-                        size: 12,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        date,
-                        style: const TextStyle(
-                          color: Color(0xFFD1D7E5),
-                          fontSize: 10,
-                        ),
-                      ),
-                      const Spacer(),
-                      Icon(
-                        Icons.more_horiz_rounded,
-                        color: Colors.white.withValues(alpha: .8),
-                        size: 18,
-                      ),
-                    ],
-                  ),
-                ],
+                    Icon(
+                      Icons.more_horiz_rounded,
+                      size: 20,
+                      color: c.textSecondary,
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -496,145 +576,94 @@ class _ProjectCard extends StatelessWidget {
 }
 
 class _TipCard extends StatelessWidget {
-  const _TipCard();
+  const _TipCard({this.vertical = false});
+
+  /// Stack the icon above the text, for a tall side-panel placement.
+  final bool vertical;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF101B2D),
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: _blue.withValues(alpha: .15)),
-      ),
-      child: const Row(
-        children: [
-          Icon(
-            Icons.lightbulb_outline_rounded,
-            color: Color(0xFFF6C86A),
-            size: 21,
-          ),
-          SizedBox(width: 11),
-          Expanded(
-            child: Text(
-              'Pro tip: Clear, top-down photos give the most accurate AI results.',
-              style: TextStyle(
-                color: Color(0xFFB5C3DD),
-                fontSize: 11,
-                height: 1.35,
-              ),
-            ),
-          ),
-        ],
-      ),
+    final c = context.colors;
+    final icon = Icon(
+      Icons.lightbulb_outline_rounded,
+      color: c.warning,
+      size: vertical ? 28 : 22,
     );
-  }
-}
+    final message = Text(
+      'Pro tip: Clear, top-down photos give the most accurate AI results.',
+      style: context.text.bodyMedium?.copyWith(color: c.textSecondary),
+    );
 
-class _BottomNav extends StatelessWidget {
-  const _BottomNav({required this.selectedIndex, required this.onSelected});
-
-  final int selectedIndex;
-  final ValueChanged<int> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    const items = [
-      (Icons.home_rounded, 'Home'),
-      (Icons.grid_view_rounded, 'Projects'),
-      (Icons.cloud_upload_outlined, 'Upload'),
-      (Icons.person_outline_rounded, 'Profile'),
-    ];
-    return BottomNavigationBar(
-      currentIndex: selectedIndex,
-      onTap: onSelected,
-      backgroundColor: const Color(0xFF0D111D),
-      elevation: 0,
-      type: BottomNavigationBarType.fixed,
-      selectedItemColor: _blue,
-      unselectedItemColor: _muted,
-      selectedFontSize: 10,
-      unselectedFontSize: 10,
-      items: [
-        for (final item in items)
-          BottomNavigationBarItem(icon: Icon(item.$1), label: item.$2),
-      ],
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      borderColor: c.primary.withValues(alpha: 0.2),
+      child: vertical
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [icon, const SizedBox(height: AppSpacing.md), message],
+            )
+          : Row(
+              children: [
+                icon,
+                const SizedBox(width: AppSpacing.md),
+                Expanded(child: message),
+              ],
+            ),
     );
   }
 }
 
 class _PlanPainter extends CustomPainter {
-  const _PlanPainter({this.accent = _blue, this.variant = 0});
+  const _PlanPainter({
+    required this.accent,
+    required this.lineColor,
+    this.variant = 0,
+  });
 
   final Color accent;
+  final Color lineColor;
   final int variant;
 
   @override
   void paint(Canvas canvas, Size size) {
     final stroke = Paint()
-      ..color = Colors.white.withValues(alpha: .78)
+      ..color = lineColor.withValues(alpha: 0.78)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     final detail = Paint()
-      ..color = accent.withValues(alpha: .8)
+      ..color = accent.withValues(alpha: 0.8)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
-    final fill = Paint()..color = accent.withValues(alpha: .10);
-    final inset = 10.0;
-    final rect = Rect.fromLTWH(inset, inset, size.width - 20, size.height - 20);
+    final fill = Paint()..color = accent.withValues(alpha: 0.10);
+    const inset = 10.0;
+    final rect = Rect.fromLTWH(
+      inset,
+      inset,
+      size.width - inset * 2,
+      size.height - inset * 2,
+    );
     canvas.drawRect(rect, stroke);
+
+    Rect room(double l, double t, double w, double h) => Rect.fromLTWH(
+      rect.left + rect.width * l,
+      rect.top + rect.height * t,
+      rect.width * w,
+      rect.height * h,
+    );
+
     final rooms = variant.isEven
         ? [
-            Rect.fromLTWH(
-              rect.left,
-              rect.top,
-              rect.width * .48,
-              rect.height * .45,
-            ),
-            Rect.fromLTWH(
-              rect.left + rect.width * .52,
-              rect.top,
-              rect.width * .48,
-              rect.height * .45,
-            ),
-            Rect.fromLTWH(
-              rect.left,
-              rect.top + rect.height * .5,
-              rect.width * .48,
-              rect.height * .5,
-            ),
-            Rect.fromLTWH(
-              rect.left + rect.width * .52,
-              rect.top + rect.height * .5,
-              rect.width * .48,
-              rect.height * .5,
-            ),
+            room(0, 0, .48, .45),
+            room(.52, 0, .48, .45),
+            room(0, .5, .48, .5),
+            room(.52, .5, .48, .5),
           ]
         : [
-            Rect.fromLTWH(
-              rect.left,
-              rect.top,
-              rect.width * .58,
-              rect.height * .42,
-            ),
-            Rect.fromLTWH(
-              rect.left + rect.width * .62,
-              rect.top,
-              rect.width * .38,
-              rect.height * .42,
-            ),
-            Rect.fromLTWH(
-              rect.left,
-              rect.top + rect.height * .47,
-              rect.width * .35,
-              rect.height * .53,
-            ),
-            Rect.fromLTWH(
-              rect.left + rect.width * .39,
-              rect.top + rect.height * .47,
-              rect.width * .61,
-              rect.height * .53,
-            ),
+            room(0, 0, .58, .42),
+            room(.62, 0, .38, .42),
+            room(0, .47, .35, .53),
+            room(.39, .47, .61, .53),
           ];
     for (var i = 0; i < rooms.length; i++) {
       canvas.drawRect(rooms[i], i == variant ? fill : stroke);
@@ -651,5 +680,7 @@ class _PlanPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _PlanPainter oldDelegate) =>
-      oldDelegate.accent != accent || oldDelegate.variant != variant;
+      oldDelegate.accent != accent ||
+      oldDelegate.lineColor != lineColor ||
+      oldDelegate.variant != variant;
 }

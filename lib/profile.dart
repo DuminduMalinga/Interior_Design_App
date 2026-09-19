@@ -14,155 +14,160 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+    final wide = !context.screenSize.isMobile;
+
+    const header = _ProfileHeader(
+      name: 'Jamie Morgan',
+      email: 'jamie.morgan@gmail.com',
+      initials: 'JM',
+    );
+    const stats = Row(
+      children: [
+        Expanded(
+          child: _ProfileStat(
+            icon: Icons.grid_view_rounded,
+            value: '12',
+            label: 'Projects',
+          ),
+        ),
+        SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: _ProfileStat(
+            icon: Icons.meeting_room_outlined,
+            value: '34',
+            label: 'Rooms designed',
+          ),
+        ),
+        SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: _ProfileStat(
+            icon: Icons.calendar_today_outlined,
+            value: 'Sep 2026',
+            label: 'Member since',
+          ),
+        ),
+      ],
+    );
+
+    final settings = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionLabel('Account'),
+        _SettingsGroup(
+          children: [
+            _SettingsTile(
+              icon: Icons.person_outline_rounded,
+              title: 'Edit profile',
+              onTap: () => _notify(context, 'Edit profile'),
+            ),
+            _SettingsTile(
+              icon: Icons.notifications_none_rounded,
+              title: 'Push notifications',
+              trailing: Switch(
+                value: _notificationsEnabled,
+                activeThumbColor: c.primary,
+                onChanged: (v) => setState(() => _notificationsEnabled = v),
+              ),
+            ),
+            _SettingsTile(
+              icon: Icons.dark_mode_outlined,
+              title: 'Appearance',
+              subtitle: 'Dark',
+              onTap: () => _notify(context, 'Appearance'),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        const _SectionLabel('Admin'),
+        _SettingsGroup(
+          children: [
+            _SettingsTile(
+              icon: Icons.admin_panel_settings_outlined,
+              title: 'Manage accounts',
+              subtitle: 'Review and approve sign-ups',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const AdminAccountsScreen(),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        const _SectionLabel('Support'),
+        _SettingsGroup(
+          children: [
+            _SettingsTile(
+              icon: Icons.help_outline_rounded,
+              title: 'Help & support',
+              onTap: () => _notify(context, 'Help & support'),
+            ),
+            _SettingsTile(
+              icon: Icons.info_outline_rounded,
+              title: 'About Planly AI',
+              subtitle: 'Version 1.0.0',
+              onTap: () => _notify(context, 'About'),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        OutlinedButton.icon(
+          onPressed: () => _signOut(context),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: c.error,
+            side: BorderSide(color: c.error.withValues(alpha: 0.35)),
+            backgroundColor: c.error.withValues(alpha: 0.08),
+          ),
+          icon: const Icon(Icons.logout_rounded, size: 18),
+          label: const Text('Sign out'),
+        ),
+      ],
+    );
+
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: _background,
         leading: IconButton(
           onPressed: () => Navigator.of(context).maybePop(),
           tooltip: 'Back',
           icon: const Icon(Icons.arrow_back_rounded),
         ),
-        title: const Text(
-          'Profile',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-        ),
-        centerTitle: true,
+        title: const Text('Profile'),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _ProfileHeader(
-                name: 'Jamie Morgan',
-                email: 'jamie.morgan@gmail.com',
-                initials: 'JM',
-              ),
-              const SizedBox(height: 24),
-              const Row(
-                children: [
-                  Expanded(
-                    child: _ProfileStat(
-                      icon: Icons.grid_view_rounded,
-                      value: '12',
-                      label: 'Projects',
+      body: AppBackground(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            child: AppContentFrame(
+              child: wide
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Expanded(
+                          flex: 4,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              header,
+                              SizedBox(height: AppSpacing.xl),
+                              stats,
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xxl),
+                        Expanded(flex: 5, child: settings),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        header,
+                        const SizedBox(height: AppSpacing.xl),
+                        stats,
+                        const SizedBox(height: AppSpacing.xxl),
+                        settings,
+                      ],
                     ),
-                  ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: _ProfileStat(
-                      icon: Icons.meeting_room_outlined,
-                      value: '34',
-                      label: 'Rooms designed',
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: _ProfileStat(
-                      icon: Icons.calendar_today_outlined,
-                      value: 'Sep 2026',
-                      label: 'Member since',
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 28),
-              const Text(
-                'Account',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 10),
-              _SettingsGroup(
-                children: [
-                  _SettingsTile(
-                    icon: Icons.person_outline_rounded,
-                    title: 'Edit profile',
-                    onTap: () => _notify(context, 'Edit profile'),
-                  ),
-                  _SettingsTile(
-                    icon: Icons.notifications_none_rounded,
-                    title: 'Push notifications',
-                    trailing: Switch(
-                      value: _notificationsEnabled,
-                      activeThumbColor: _blue,
-                      onChanged: (v) =>
-                          setState(() => _notificationsEnabled = v),
-                    ),
-                  ),
-                  _SettingsTile(
-                    icon: Icons.dark_mode_outlined,
-                    title: 'Appearance',
-                    subtitle: 'Dark',
-                    onTap: () => _notify(context, 'Appearance'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 22),
-              const Text(
-                'Admin',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 10),
-              _SettingsGroup(
-                children: [
-                  _SettingsTile(
-                    icon: Icons.admin_panel_settings_outlined,
-                    title: 'Manage accounts',
-                    subtitle: 'Review and approve sign-ups',
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const AdminAccountsScreen(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 22),
-              const Text(
-                'Support',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 10),
-              _SettingsGroup(
-                children: [
-                  _SettingsTile(
-                    icon: Icons.help_outline_rounded,
-                    title: 'Help & support',
-                    onTap: () => _notify(context, 'Help & support'),
-                  ),
-                  _SettingsTile(
-                    icon: Icons.info_outline_rounded,
-                    title: 'About Planly AI',
-                    subtitle: 'Version 1.0.0',
-                    onTap: () => _notify(context, 'About'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 28),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: OutlinedButton.icon(
-                  onPressed: () => _signOut(context),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFFF6B6B),
-                    side: const BorderSide(color: Color(0x55FF6B6B)),
-                    backgroundColor: const Color(
-                      0xFFFF6B6B,
-                    ).withValues(alpha: .08),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                  ),
-                  icon: const Icon(Icons.logout_rounded, size: 18),
-                  label: const Text(
-                    'Sign out',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -171,11 +176,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _notify(BuildContext context, String feature) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: _surface,
-        behavior: SnackBarBehavior.floating,
-        content: Text('$feature coming soon.'),
-      ),
+      SnackBar(content: Text('$feature coming soon.')),
     );
   }
 
@@ -183,6 +184,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const AuthScreen()),
       (route) => false,
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: Text(label, style: context.text.titleSmall),
     );
   }
 }
@@ -200,28 +215,26 @@ class _ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+    final text = context.text;
+
     return Row(
       children: [
         Stack(
           children: [
-            Container(
-              width: 72,
-              height: 72,
+            DecoratedBox(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [_violet, _blue],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                border: Border.all(color: Colors.white24, width: 2),
+                gradient: c.brandGradient,
+                border: Border.all(color: c.glassBorder, width: 2),
+                boxShadow: AppShadows.glow(c.primary),
               ),
-              child: Center(
-                child: Text(
-                  initials,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 22,
+              child: SizedBox.square(
+                dimension: 76,
+                child: Center(
+                  child: Text(
+                    initials,
+                    style: text.headlineSmall?.copyWith(color: c.onPrimary),
                   ),
                 ),
               ),
@@ -229,81 +242,47 @@ class _ProfileHeader extends StatelessWidget {
             Positioned(
               right: 0,
               bottom: 0,
-              child: Container(
-                width: 24,
-                height: 24,
-                alignment: Alignment.center,
+              child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: _blue,
+                  color: c.primary,
                   shape: BoxShape.circle,
-                  border: Border.all(color: _background, width: 2),
+                  border: Border.all(color: c.background, width: 2),
                 ),
-                child: const Icon(
-                  Icons.camera_alt_rounded,
-                  color: Colors.white,
-                  size: 12,
+                child: SizedBox.square(
+                  dimension: 26,
+                  child: Icon(
+                    Icons.camera_alt_rounded,
+                    color: c.onPrimary,
+                    size: 13,
+                  ),
                 ),
               ),
             ),
           ],
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: AppSpacing.lg),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 4),
+              Text(name, style: text.titleLarge),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 email,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: _muted, fontSize: 12),
+                style: text.bodySmall?.copyWith(color: c.textMuted),
               ),
-              const SizedBox(height: 8),
-              const _ProPill(),
+              const SizedBox(height: AppSpacing.sm),
+              AppStatusChip(
+                label: 'PRO PLAN',
+                icon: Icons.auto_awesome_rounded,
+                color: c.secondary,
+              ),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ProPill extends StatelessWidget {
-  const _ProPill();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: _violet.withValues(alpha: .18),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _violet.withValues(alpha: .35)),
-      ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.auto_awesome_rounded, color: Color(0xFFC9B8FF), size: 12),
-          SizedBox(width: 5),
-          Text(
-            'PRO PLAN',
-            style: TextStyle(
-              color: Color(0xFFC9B8FF),
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
-              letterSpacing: .5,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -321,30 +300,30 @@ class _ProfileStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: .08)),
+    final c = context.colors;
+    final text = context.text;
+
+    return AppCard(
+      padding: const EdgeInsets.symmetric(
+        vertical: AppSpacing.lg,
+        horizontal: AppSpacing.sm,
       ),
       child: Column(
         children: [
-          Icon(icon, color: _blue, size: 18),
-          const SizedBox(height: 7),
+          Icon(icon, color: c.primary, size: 20),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+            style: text.titleSmall,
           ),
-          const SizedBox(height: 2),
           Text(
             label,
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: _muted, fontSize: 9.5),
+            style: text.labelSmall?.copyWith(color: c.textMuted),
           ),
         ],
       ),
@@ -359,24 +338,26 @@ class _SettingsGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: .07)),
-      ),
-      child: Column(
-        children: [
-          for (var i = 0; i < children.length; i++) ...[
-            children[i],
-            if (i != children.length - 1)
-              Divider(
-                height: 1,
-                indent: 54,
-                color: Colors.white.withValues(alpha: .06),
-              ),
-          ],
-        ],
+    final c = context.colors;
+
+    return AppCard(
+      padding: EdgeInsets.zero,
+      // Ink splashes paint on the nearest Material, so it has to sit inside
+      // the card's decoration to be visible.
+      child: ClipRRect(
+        borderRadius: AppRadius.lgAll,
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(
+            children: [
+              for (var i = 0; i < children.length; i++) ...[
+                children[i],
+                if (i != children.length - 1)
+                  Divider(height: 1, indent: 56, color: c.border),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -399,37 +380,38 @@ class _SettingsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+    final text = context.text;
+
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        child: Row(
-          children: [
-            Icon(icon, color: _muted, size: 19),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.md,
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 32),
+          child: Row(
+            children: [
+              Icon(icon, color: c.textMuted, size: 20),
+              const SizedBox(width: AppSpacing.lg),
+              Expanded(child: Text(title, style: text.titleSmall)),
+              if (subtitle != null) ...[
+                Flexible(
+                  child: Text(
+                    subtitle!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: text.bodySmall?.copyWith(color: c.textMuted),
+                  ),
                 ),
-              ),
-            ),
-            if (subtitle != null) ...[
-              Text(
-                subtitle!,
-                style: const TextStyle(color: _muted, fontSize: 11.5),
-              ),
-              const SizedBox(width: 6),
+                const SizedBox(width: AppSpacing.sm),
+              ],
+              trailing ??
+                  Icon(Icons.chevron_right_rounded, color: c.textMuted, size: 20),
             ],
-            trailing ??
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: _muted,
-                  size: 20,
-                ),
-          ],
+          ),
         ),
       ),
     );
