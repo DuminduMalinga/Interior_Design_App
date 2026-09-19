@@ -7,6 +7,7 @@ import 'app_components.dart';
 import 'app_theme.dart';
 import 'responsive.dart';
 
+part 'splash.dart';
 part 'dashboard.dart';
 part 'projects.dart';
 part 'upload.dart';
@@ -30,7 +31,7 @@ class MyApp extends StatelessWidget {
       title: 'LiviSpace',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme(),
-      home: const WelcomeScreen(),
+      home: const SplashScreen(),
     );
   }
 }
