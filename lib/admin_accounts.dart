@@ -1,6 +1,22 @@
 part of 'main.dart';
 
-enum _AccountStatus { pending, approved, rejected }
+enum _AccountStatus {
+  pending,
+  approved,
+  rejected;
+
+  AppStatus get status => switch (this) {
+    pending => AppStatus.warning,
+    approved => AppStatus.success,
+    rejected => AppStatus.error,
+  };
+
+  String get label => switch (this) {
+    pending => 'Pending',
+    approved => 'Approved',
+    rejected => 'Rejected',
+  };
+}
 
 class _UserAccount {
   _UserAccount({
@@ -125,85 +141,69 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
   @override
   Widget build(BuildContext context) {
     final results = _filtered;
+    final wide = !context.screenSize.isMobile;
+
+    final search = _SearchField(
+      controller: _searchController,
+      onChanged: (v) => setState(() => _query = v),
+    );
+    final tabs = Row(
+      children: [
+        for (final (index, label) in const ['Pending', 'Approved', 'All'].indexed) ...[
+          if (index > 0) const SizedBox(width: AppSpacing.sm),
+          _FilterTab(
+            label: label,
+            count: _countFor(index),
+            selected: _tab == index,
+            onTap: () => setState(() => _tab = index),
+          ),
+        ],
+      ],
+    );
+
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: _background,
         leading: IconButton(
           onPressed: () => Navigator.of(context).maybePop(),
           tooltip: 'Back',
           icon: const Icon(Icons.arrow_back_rounded),
         ),
-        title: const Text(
-          'Manage accounts',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-        ),
-        centerTitle: true,
+        title: const Text('Manage accounts'),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+      body: AppBackground(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            child: AppContentFrame(
+              verticalPadding: AppSpacing.lg,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _SearchField(
-                    controller: _searchController,
-                    onChanged: (v) => setState(() => _query = v),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      _FilterTab(
-                        label: 'Pending',
-                        count: _countFor(0),
-                        selected: _tab == 0,
-                        onTap: () => setState(() => _tab = 0),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterTab(
-                        label: 'Approved',
-                        count: _countFor(1),
-                        selected: _tab == 1,
-                        onTap: () => setState(() => _tab = 1),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterTab(
-                        label: 'All',
-                        count: _countFor(2),
-                        selected: _tab == 2,
-                        onTap: () => setState(() => _tab = 2),
-                      ),
-                    ],
-                  ),
+                  if (wide)
+                    Row(
+                      children: [
+                        Expanded(child: search),
+                        const SizedBox(width: AppSpacing.lg),
+                        SizedBox(width: 420, child: tabs),
+                      ],
+                    )
+                  else ...[
+                    search,
+                    const SizedBox(height: AppSpacing.md),
+                    tabs,
+                  ],
+                  const SizedBox(height: AppSpacing.xl),
+                  if (results.isEmpty)
+                    const _EmptyState()
+                  else
+                    _AccountList(
+                      accounts: results,
+                      onApprove: (a) => _updateStatus(a, _AccountStatus.approved),
+                      onReject: (a) => _updateStatus(a, _AccountStatus.rejected),
+                    ),
                 ],
               ),
             ),
-            const SizedBox(height: 6),
-            Expanded(
-              child: results.isEmpty
-                  ? const _EmptyState()
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
-                      itemCount: results.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final account = results[index];
-                        return _AccountCard(
-                          account: account,
-                          onApprove: () => _updateStatus(
-                            account,
-                            _AccountStatus.approved,
-                          ),
-                          onReject: () => _updateStatus(
-                            account,
-                            _AccountStatus.rejected,
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -213,14 +213,53 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
     setState(() => account.status = status);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: _surface,
-        behavior: SnackBarBehavior.floating,
         content: Text(
           status == _AccountStatus.approved
               ? '${account.name} approved.'
               : '${account.name} rejected.',
         ),
       ),
+    );
+  }
+}
+
+/// One column on phones, two on tablets, three on desktop. Cards keep their
+/// natural height, so this wraps instead of using a fixed-ratio grid.
+class _AccountList extends StatelessWidget {
+  const _AccountList({
+    required this.accounts,
+    required this.onApprove,
+    required this.onReject,
+  });
+
+  final List<_UserAccount> accounts;
+  final ValueChanged<_UserAccount> onApprove;
+  final ValueChanged<_UserAccount> onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final columns = context.responsive(mobile: 1, tablet: 2, desktop: 3);
+    const spacing = AppSpacing.md;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = (constraints.maxWidth - spacing * (columns - 1)) / columns;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final account in accounts)
+              SizedBox(
+                width: width,
+                child: _AccountCard(
+                  account: account,
+                  onApprove: () => onApprove(account),
+                  onReject: () => onReject(account),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -233,45 +272,22 @@ class _SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: .08)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.search_rounded, color: _muted, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              onChanged: onChanged,
-              style: const TextStyle(fontSize: 13),
-              decoration: const InputDecoration(
-                isDense: true,
-                border: InputBorder.none,
-                hintText: 'Search by name or email',
-                hintStyle: TextStyle(color: _muted, fontSize: 13),
-              ),
-            ),
-          ),
-          if (controller.text.isNotEmpty)
-            InkWell(
-              onTap: () {
+    return AppInputField(
+      controller: controller,
+      onChanged: onChanged,
+      hintText: 'Search by name or email',
+      prefixIcon: Icons.search_rounded,
+      textInputAction: TextInputAction.search,
+      suffixIcon: controller.text.isEmpty
+          ? null
+          : IconButton(
+              tooltip: 'Clear search',
+              icon: const Icon(Icons.close_rounded, size: 18),
+              onPressed: () {
                 controller.clear();
                 onChanged('');
               },
-              borderRadius: BorderRadius.circular(20),
-              child: const Padding(
-                padding: EdgeInsets.all(2),
-                child: Icon(Icons.close_rounded, color: _muted, size: 18),
-              ),
             ),
-        ],
-      ),
     );
   }
 }
@@ -291,32 +307,29 @@ class _FilterTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+
     return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(13),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            gradient: selected
-                ? const LinearGradient(colors: [_blue, _violet])
-                : null,
-            color: selected ? null : _surface,
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(
-              color: selected
-                  ? Colors.transparent
-                  : Colors.white.withValues(alpha: .08),
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: AppRadius.mdAll,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            height: 52,
+            decoration: BoxDecoration(
+              gradient: selected ? c.brandGradient : null,
+              color: selected ? null : c.surface,
+              borderRadius: AppRadius.mdAll,
+              border: Border.all(color: selected ? Colors.transparent : c.border),
             ),
-          ),
-          child: Center(
-            child: Text(
-              '$label ($count)',
-              style: TextStyle(
-                color: selected ? Colors.white : _muted,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
+            child: Center(
+              child: Text(
+                '$label ($count)',
+                style: context.text.labelMedium?.copyWith(
+                  color: selected ? c.onPrimary : c.textMuted,
+                ),
               ),
             ),
           ),
@@ -339,39 +352,31 @@ class _AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: .07)),
-      ),
+    final c = context.colors;
+    final text = context.text;
+    final pending = account.status == _AccountStatus.pending;
+
+    return AppCard(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 46,
-            height: 46,
+          DecoratedBox(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [_violet, _blue],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              border: Border.all(color: Colors.white24, width: 1.5),
+              gradient: c.brandGradient,
+              border: Border.all(color: c.glassBorder, width: 1.5),
             ),
-            child: Center(
-              child: Text(
-                account.initials,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
+            child: SizedBox.square(
+              dimension: 48,
+              child: Center(
+                child: Text(
+                  account.initials,
+                  style: text.labelLarge?.copyWith(color: c.onPrimary),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -380,50 +385,47 @@ class _AccountCard extends StatelessWidget {
                   account.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: text.titleSmall,
                 ),
-                const SizedBox(height: 3),
                 Text(
                   account.email,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: _muted, fontSize: 11.5),
+                  style: text.bodySmall?.copyWith(color: c.textMuted),
                 ),
-                const SizedBox(height: 8),
-                Row(
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    _StatusBadge(status: account.status),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Joined ${account.joined}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: _muted, fontSize: 10),
-                      ),
+                    AppStatusChip(
+                      label: account.status.label,
+                      status: account.status.status,
+                    ),
+                    Text(
+                      'Joined ${account.joined}',
+                      style: text.labelSmall?.copyWith(color: c.textMuted),
                     ),
                   ],
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          if (account.status == _AccountStatus.pending)
+          const SizedBox(width: AppSpacing.sm),
+          if (pending)
             Column(
               children: [
                 _RoundIconButton(
                   icon: Icons.check_rounded,
-                  color: const Color(0xFF4ADE80),
+                  color: c.success,
                   tooltip: 'Approve',
                   onTap: onApprove,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 _RoundIconButton(
                   icon: Icons.close_rounded,
-                  color: const Color(0xFFFF6B6B),
+                  color: c.error,
                   tooltip: 'Reject',
                   onTap: onReject,
                 ),
@@ -434,9 +436,7 @@ class _AccountCard extends StatelessWidget {
               account.status == _AccountStatus.approved
                   ? Icons.verified_rounded
                   : Icons.block_rounded,
-              color: account.status == _AccountStatus.approved
-                  ? const Color(0xFF4ADE80)
-                  : const Color(0xFFFF6B6B),
+              color: account.status.status.colorIn(c),
               size: 20,
             ),
         ],
@@ -460,55 +460,24 @@ class _RoundIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Tooltip(
-          message: tooltip,
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
           child: Container(
-            width: 32,
-            height: 32,
+            width: 36,
+            height: 36,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: .16),
+              color: color.withValues(alpha: 0.16),
               shape: BoxShape.circle,
-              border: Border.all(color: color.withValues(alpha: .4)),
+              border: Border.all(color: color.withValues(alpha: 0.4)),
             ),
-            child: Icon(icon, color: color, size: 17),
+            child: Icon(icon, color: color, size: 18),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status});
-
-  final _AccountStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    final (label, color) = switch (status) {
-      _AccountStatus.pending => ('Pending', const Color(0xFFF6C86A)),
-      _AccountStatus.approved => ('Approved', const Color(0xFF4ADE80)),
-      _AccountStatus.rejected => ('Rejected', const Color(0xFFFF6B6B)),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: .16),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: .4)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 9.5,
-          fontWeight: FontWeight.w800,
         ),
       ),
     );
@@ -520,27 +489,22 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(AppSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.person_search_rounded,
-              color: Colors.white.withValues(alpha: .2),
-              size: 46,
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              'No accounts found',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 6),
-            const Text(
+            Icon(Icons.person_search_rounded, color: c.textMuted, size: 46),
+            const SizedBox(height: AppSpacing.lg),
+            Text('No accounts found', style: context.text.titleSmall),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
               'Try a different search or switch filters.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: _muted, fontSize: 12),
+              style: context.text.bodySmall?.copyWith(color: c.textMuted),
             ),
           ],
         ),
