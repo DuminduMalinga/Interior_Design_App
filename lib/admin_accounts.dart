@@ -1,48 +1,8 @@
 part of 'main.dart';
 
-enum _AccountStatus {
-  pending,
-  approved,
-  rejected;
-
-  AppStatus get status => switch (this) {
-    pending => AppStatus.warning,
-    approved => AppStatus.success,
-    rejected => AppStatus.error,
-  };
-
-  String get label => switch (this) {
-    pending => 'Pending',
-    approved => 'Approved',
-    rejected => 'Rejected',
-  };
-}
-
-class _UserAccount {
-  _UserAccount({
-    required this.id,
-    required this.name,
-    required this.email,
-    required this.joined,
-    required this.status,
-  });
-
-  final String id;
-  final String name;
-  final String email;
-  final String joined;
-  _AccountStatus status;
-
-  String get initials {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
-    return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
-        .toUpperCase();
-  }
-}
-
-/// Admin panel for reviewing and moderating user accounts: search, filter
-/// by status, and approve or reject pending sign-ups.
+/// Admin panel for reviewing `DeletionRequest` rows: search, filter by
+/// status, and approve (which deletes the auth user via the `delete-user`
+/// edge function) or reject.
 class AdminAccountsScreen extends StatefulWidget {
   const AdminAccountsScreen({super.key});
 
@@ -54,58 +14,20 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
   final _searchController = TextEditingController();
   String _query = '';
   int _tab = 0;
+  List<DeletionRequestRecord>? _accounts;
+  final Set<String> _busyIds = {};
 
-  late final List<_UserAccount> _accounts = [
-    _UserAccount(
-      id: '1',
-      name: 'Jamie Morgan',
-      email: 'jamie.morgan@gmail.com',
-      joined: 'Sep 12, 2026',
-      status: _AccountStatus.pending,
-    ),
-    _UserAccount(
-      id: '2',
-      name: 'Aisha Rahman',
-      email: 'aisha.rahman@outlook.com',
-      joined: 'Sep 11, 2026',
-      status: _AccountStatus.pending,
-    ),
-    _UserAccount(
-      id: '3',
-      name: 'Leo Fernandes',
-      email: 'leo.fernandes@yahoo.com',
-      joined: 'Sep 10, 2026',
-      status: _AccountStatus.approved,
-    ),
-    _UserAccount(
-      id: '4',
-      name: 'Priya Nair',
-      email: 'priya.nair@gmail.com',
-      joined: 'Sep 9, 2026',
-      status: _AccountStatus.approved,
-    ),
-    _UserAccount(
-      id: '5',
-      name: 'Marcus Chen',
-      email: 'marcus.chen@studio.io',
-      joined: 'Sep 7, 2026',
-      status: _AccountStatus.rejected,
-    ),
-    _UserAccount(
-      id: '6',
-      name: 'Sofia Delgado',
-      email: 'sofia.delgado@gmail.com',
-      joined: 'Sep 6, 2026',
-      status: _AccountStatus.pending,
-    ),
-    _UserAccount(
-      id: '7',
-      name: 'Ravi Kapoor',
-      email: 'ravi.kapoor@buildwise.com',
-      joined: 'Sep 3, 2026',
-      status: _AccountStatus.approved,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final accounts = await AdminRepository.instance.fetchDeletionRequests();
+    if (!mounted) return;
+    setState(() => _accounts = accounts);
+  }
 
   @override
   void dispose() {
@@ -113,33 +35,36 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
     super.dispose();
   }
 
-  List<_UserAccount> get _filtered {
+  List<DeletionRequestRecord> get _filtered {
+    final accounts = _accounts ?? const [];
     final byTab = switch (_tab) {
-      0 => _accounts.where((a) => a.status == _AccountStatus.pending),
-      1 => _accounts.where((a) => a.status == _AccountStatus.approved),
-      _ => _accounts,
+      0 => accounts.where((a) => a.status == DeletionStatus.pending),
+      1 => accounts.where((a) => a.status == DeletionStatus.approved),
+      _ => accounts,
     };
     final q = _query.trim().toLowerCase();
     if (q.isEmpty) return byTab.toList();
     return byTab
         .where(
           (a) =>
-              a.name.toLowerCase().contains(q) ||
-              a.email.toLowerCase().contains(q),
+              a.displayName.toLowerCase().contains(q) ||
+              (a.email ?? '').toLowerCase().contains(q),
         )
         .toList();
   }
 
   int _countFor(int tab) {
+    final accounts = _accounts ?? const [];
     return switch (tab) {
-      0 => _accounts.where((a) => a.status == _AccountStatus.pending).length,
-      1 => _accounts.where((a) => a.status == _AccountStatus.approved).length,
-      _ => _accounts.length,
+      0 => accounts.where((a) => a.status == DeletionStatus.pending).length,
+      1 => accounts.where((a) => a.status == DeletionStatus.approved).length,
+      _ => accounts.length,
     };
   }
 
   @override
   Widget build(BuildContext context) {
+    final loading = _accounts == null;
     final results = _filtered;
     final wide = !context.screenSize.isMobile;
 
@@ -172,35 +97,47 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
       ),
       body: AppBackground(
         child: SafeArea(
-          child: SingleChildScrollView(
-            child: AppContentFrame(
-              verticalPadding: AppSpacing.lg,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (wide)
-                    Row(
-                      children: [
-                        Expanded(child: search),
-                        const SizedBox(width: AppSpacing.lg),
-                        SizedBox(width: 420, child: tabs),
-                      ],
-                    )
-                  else ...[
-                    search,
-                    const SizedBox(height: AppSpacing.md),
-                    tabs,
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: AppContentFrame(
+                verticalPadding: AppSpacing.lg,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (wide)
+                      Row(
+                        children: [
+                          Expanded(child: search),
+                          const SizedBox(width: AppSpacing.lg),
+                          SizedBox(width: 420, child: tabs),
+                        ],
+                      )
+                    else ...[
+                      search,
+                      const SizedBox(height: AppSpacing.md),
+                      tabs,
+                    ],
+                    const SizedBox(height: AppSpacing.xl),
+                    if (loading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+                        child: Center(
+                          child: CircularProgressIndicator(strokeWidth: 2.4),
+                        ),
+                      )
+                    else if (results.isEmpty)
+                      const _EmptyState()
+                    else
+                      _AccountList(
+                        accounts: results,
+                        busyIds: _busyIds,
+                        onApprove: _approve,
+                        onReject: _reject,
+                      ),
                   ],
-                  const SizedBox(height: AppSpacing.xl),
-                  if (results.isEmpty)
-                    const _EmptyState()
-                  else
-                    _AccountList(
-                      accounts: results,
-                      onApprove: (a) => _updateStatus(a, _AccountStatus.approved),
-                      onReject: (a) => _updateStatus(a, _AccountStatus.rejected),
-                    ),
-                ],
+                ),
               ),
             ),
           ),
@@ -209,17 +146,42 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
     );
   }
 
-  void _updateStatus(_UserAccount account, _AccountStatus status) {
-    setState(() => account.status = status);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          status == _AccountStatus.approved
-              ? '${account.name} approved.'
-              : '${account.name} rejected.',
-        ),
-      ),
-    );
+  Future<void> _approve(DeletionRequestRecord account) async {
+    setState(() => _busyIds.add(account.requestId));
+    try {
+      await AdminRepository.instance.approveRequest(account);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${account.displayName} approved and removed.')),
+      );
+      await _load();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not approve: $error')));
+    } finally {
+      if (mounted) setState(() => _busyIds.remove(account.requestId));
+    }
+  }
+
+  Future<void> _reject(DeletionRequestRecord account) async {
+    setState(() => _busyIds.add(account.requestId));
+    try {
+      await AdminRepository.instance.rejectRequest(account.requestId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${account.displayName} rejected.')),
+      );
+      await _load();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not reject: $error')));
+    } finally {
+      if (mounted) setState(() => _busyIds.remove(account.requestId));
+    }
   }
 }
 
@@ -228,13 +190,15 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
 class _AccountList extends StatelessWidget {
   const _AccountList({
     required this.accounts,
+    required this.busyIds,
     required this.onApprove,
     required this.onReject,
   });
 
-  final List<_UserAccount> accounts;
-  final ValueChanged<_UserAccount> onApprove;
-  final ValueChanged<_UserAccount> onReject;
+  final List<DeletionRequestRecord> accounts;
+  final Set<String> busyIds;
+  final ValueChanged<DeletionRequestRecord> onApprove;
+  final ValueChanged<DeletionRequestRecord> onReject;
 
   @override
   Widget build(BuildContext context) {
@@ -253,6 +217,7 @@ class _AccountList extends StatelessWidget {
                 width: width,
                 child: _AccountCard(
                   account: account,
+                  busy: busyIds.contains(account.requestId),
                   onApprove: () => onApprove(account),
                   onReject: () => onReject(account),
                 ),
@@ -339,14 +304,22 @@ class _FilterTab extends StatelessWidget {
   }
 }
 
+AppStatus _deletionStatusVisual(DeletionStatus status) => switch (status) {
+  DeletionStatus.pending => AppStatus.warning,
+  DeletionStatus.approved => AppStatus.success,
+  DeletionStatus.rejected => AppStatus.error,
+};
+
 class _AccountCard extends StatelessWidget {
   const _AccountCard({
     required this.account,
+    required this.busy,
     required this.onApprove,
     required this.onReject,
   });
 
-  final _UserAccount account;
+  final DeletionRequestRecord account;
+  final bool busy;
   final VoidCallback onApprove;
   final VoidCallback onReject;
 
@@ -354,7 +327,8 @@ class _AccountCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final text = context.text;
-    final pending = account.status == _AccountStatus.pending;
+    final pending = account.status == DeletionStatus.pending;
+    final statusVisual = _deletionStatusVisual(account.status);
 
     return AppCard(
       child: Row(
@@ -382,17 +356,18 @@ class _AccountCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  account.name,
+                  account.displayName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: text.titleSmall,
                 ),
-                Text(
-                  account.email,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: text.bodySmall?.copyWith(color: c.textMuted),
-                ),
+                if (account.email != null)
+                  Text(
+                    account.email!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: text.bodySmall?.copyWith(color: c.textMuted),
+                  ),
                 const SizedBox(height: AppSpacing.sm),
                 Wrap(
                   spacing: AppSpacing.sm,
@@ -400,11 +375,11 @@ class _AccountCard extends StatelessWidget {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     AppStatusChip(
-                      label: account.status.label,
-                      status: account.status.status,
+                      label: account.status.raw,
+                      status: statusVisual,
                     ),
                     Text(
-                      'Joined ${account.joined}',
+                      'Requested ${_formatRelativeDate(account.requestedAt)}',
                       style: text.labelSmall?.copyWith(color: c.textMuted),
                     ),
                   ],
@@ -413,7 +388,13 @@ class _AccountCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
-          if (pending)
+          if (busy)
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else if (pending)
             Column(
               children: [
                 _RoundIconButton(
@@ -433,10 +414,10 @@ class _AccountCard extends StatelessWidget {
             )
           else
             Icon(
-              account.status == _AccountStatus.approved
+              account.status == DeletionStatus.approved
                   ? Icons.verified_rounded
                   : Icons.block_rounded,
-              color: account.status.status.colorIn(c),
+              color: statusVisual.colorIn(c),
               size: 20,
             ),
         ],
