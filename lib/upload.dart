@@ -8,7 +8,10 @@ class UploadScreen extends StatefulWidget {
 }
 
 class _UploadScreenState extends State<UploadScreen> {
-  bool _selected = false;
+  PlatformFile? _picked;
+  bool _uploading = false;
+
+  bool get _selected => _picked != null;
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +21,8 @@ class _UploadScreenState extends State<UploadScreen> {
 
     final dropzone = _UploadDropzone(
       selected: _selected,
-      onSelect: () => setState(() => _selected = true),
+      fileName: _picked?.name,
+      onSelect: _pickFile,
     );
     final details = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -37,9 +41,8 @@ class _UploadScreenState extends State<UploadScreen> {
           icon: _selected
               ? Icons.auto_awesome_rounded
               : Icons.cloud_upload_outlined,
-          onPressed: _selected
-              ? () => _openProcessing(context)
-              : () => setState(() => _selected = true),
+          loading: _uploading,
+          onPressed: _selected ? _submit : _pickFile,
         ),
       ],
     );
@@ -87,17 +90,63 @@ class _UploadScreenState extends State<UploadScreen> {
     );
   }
 
-  void _openProcessing(BuildContext context) {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const ProcessingScreen()));
+  Future<void> _pickFile() async {
+    final file = await FilePicker.pickFile(type: FileType.image);
+    if (file == null) return;
+    setState(() => _picked = file);
+  }
+
+  Future<void> _submit() async {
+    final file = _picked;
+    final user = AuthService.instance.currentUser;
+    if (file == null || user == null) return;
+
+    setState(() => _uploading = true);
+    try {
+      final bytes = await file.readAsBytes();
+      final ext = (file.extension ?? 'jpg').toLowerCase();
+      final path = await FloorPlanRepository.instance.uploadFloorPlanImage(
+        userId: user.id,
+        bytes: bytes,
+        fileExt: ext,
+      );
+      final floorPlan = await FloorPlanRepository.instance.createFloorPlan(
+        userId: user.id,
+        imagePath: path,
+      );
+      if (!mounted) return;
+      setState(() {
+        _uploading = false;
+        _picked = null;
+      });
+      _openProcessing(context, floorPlan);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _uploading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Upload failed: $error')),
+      );
+    }
+  }
+
+  void _openProcessing(BuildContext context, FloorPlanRecord floorPlan) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ProcessingScreen(floorPlan: floorPlan),
+      ),
+    );
   }
 }
 
 class _UploadDropzone extends StatelessWidget {
-  const _UploadDropzone({required this.selected, required this.onSelect});
+  const _UploadDropzone({
+    required this.selected,
+    required this.onSelect,
+    this.fileName,
+  });
 
   final bool selected;
+  final String? fileName;
   final VoidCallback onSelect;
 
   @override
@@ -159,8 +208,10 @@ class _UploadDropzone extends StatelessWidget {
               const SizedBox(height: AppSpacing.sm),
               Text(
                 selected
-                    ? 'Tap below to generate your AI design'
-                    : 'Drag and drop or choose an image to begin',
+                    ? (fileName ?? 'Tap below to generate your AI design')
+                    : 'Choose an image to begin',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: text.bodySmall?.copyWith(color: c.textMuted),
               ),
@@ -171,13 +222,8 @@ class _UploadDropzone extends StatelessWidget {
                 runSpacing: AppSpacing.sm,
                 children: [
                   _UploadAction(
-                    icon: Icons.camera_alt_outlined,
-                    label: 'Camera',
-                    onTap: onSelect,
-                  ),
-                  _UploadAction(
                     icon: Icons.photo_library_outlined,
-                    label: 'Gallery',
+                    label: 'Choose image',
                     onTap: onSelect,
                   ),
                 ],
@@ -355,7 +401,9 @@ class _DashedBorderPainter extends CustomPainter {
 }
 
 class _LegacyProcessingScreen extends StatefulWidget {
-  const _LegacyProcessingScreen();
+  const _LegacyProcessingScreen({required this.floorPlan});
+
+  final FloorPlanRecord floorPlan;
 
   @override
   State<_LegacyProcessingScreen> createState() => _ProcessingScreenState();
@@ -365,8 +413,9 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   Timer? _statusTimer;
-  Timer? _completeTimer;
+  StreamSubscription<FloorPlanAnalysisRecord?>? _analysisSub;
   int _statusIndex = 0;
+  bool _timedOut = false;
 
   static const _statuses = [
     'Detecting rooms...',
@@ -382,10 +431,11 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
       duration: const Duration(milliseconds: 2200),
     )..repeat();
     _statusTimer = Timer(const Duration(milliseconds: 1500), _advanceStatus);
-    _completeTimer = Timer(
-      const Duration(milliseconds: 5400),
-      _openRoomSelection,
-    );
+    _analysisSub = FloorPlanRepository.instance
+        .watchAnalysis(widget.floorPlan.floorPlanId)
+        .listen(_onAnalysisUpdate, onDone: () {
+          if (mounted && !_timedOut) setState(() => _timedOut = true);
+        });
   }
 
   void _advanceStatus() {
@@ -394,17 +444,28 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
     _statusTimer = Timer(const Duration(milliseconds: 1800), _advanceStatus);
   }
 
+  void _onAnalysisUpdate(FloorPlanAnalysisRecord? analysis) {
+    if (!mounted || analysis == null) return;
+    if (analysis.isComplete) {
+      _openRoomSelection();
+    } else if (analysis.isFailed) {
+      setState(() => _timedOut = true);
+    }
+  }
+
   void _openRoomSelection() {
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const RoomSelectionScreen()),
+      MaterialPageRoute<void>(
+        builder: (_) => RoomSelectionScreen(floorPlan: widget.floorPlan),
+      ),
     );
   }
 
   @override
   void dispose() {
     _statusTimer?.cancel();
-    _completeTimer?.cancel();
+    _analysisSub?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -478,21 +539,34 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       Text(
-                        'Our AI is analyzing every detail',
+                        _timedOut
+                            ? "This is taking longer than usual — we'll keep "
+                                  "working on it in the background."
+                            : 'Our AI is analyzing every detail',
+                        textAlign: TextAlign.center,
                         style: text.bodySmall?.copyWith(color: c.textMuted),
                       ),
                       const SizedBox(height: AppSpacing.xl),
-                      SizedBox(
-                        width: 168,
-                        child: ClipRRect(
-                          borderRadius: AppRadius.fullAll,
-                          child: LinearProgressIndicator(
-                            minHeight: 4,
-                            color: c.primary,
-                            backgroundColor: c.glassFill,
+                      if (_timedOut)
+                        AppButton(
+                          label: 'Back to dashboard',
+                          expanded: false,
+                          onPressed: () => Navigator.of(
+                            context,
+                          ).popUntil((route) => route.isFirst),
+                        )
+                      else
+                        SizedBox(
+                          width: 168,
+                          child: ClipRRect(
+                            borderRadius: AppRadius.fullAll,
+                            child: LinearProgressIndicator(
+                              minHeight: 4,
+                              color: c.primary,
+                              backgroundColor: c.glassFill,
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
