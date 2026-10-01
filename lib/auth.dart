@@ -165,7 +165,9 @@ class _AuthScreenState extends State<AuthScreen> {
                 child: TextButton(
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => const ForgotPasswordScreen(),
+                      builder: (_) => ForgotPasswordScreen(
+                        initialEmail: _emailController.text.trim(),
+                      ),
                     ),
                   ),
                   child: const Text('Forgot password?'),
@@ -182,7 +184,7 @@ class _AuthScreenState extends State<AuthScreen> {
           const _OrDivider(),
           const SizedBox(height: AppSpacing.lg),
           OutlinedButton.icon(
-            onPressed: () => _notify(context, 'Google sign-in'),
+            onPressed: () => _signInWithGoogle(context),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
               backgroundColor: c.glassFill,
@@ -244,21 +246,51 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  void _notify(BuildContext context, String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$feature coming soon.')),
-    );
+  void _showError(BuildContext context, Object error) {
+    final message = error is AuthException
+        ? error.message
+        : 'Something went wrong. Please try again.';
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _signInWithGoogle(BuildContext context) async {
+    try {
+      await AuthService.instance.signInWithGoogle();
+    } catch (error) {
+      if (!context.mounted) return;
+      _showError(context, error);
+    }
   }
 
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _submitting = true);
-    await Future<void>.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    setState(() => _submitting = false);
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const DashboardScreen()),
-    );
+    try {
+      if (_isSignUp) {
+        await AuthService.instance.signUp(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          fullName: _fullNameController.text.trim(),
+          username: _usernameController.text.trim(),
+        );
+      } else {
+        await AuthService.instance.signIn(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+      }
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(builder: (_) => const DashboardScreen()),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showError(context, error);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 }
 
