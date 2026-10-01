@@ -2,11 +2,15 @@ part of 'main.dart';
 
 /// Shown after [ProcessingScreen] finishes analyzing the uploaded floor plan.
 ///
-/// Presents the AI-detected rooms as an interactive top-down diagram plus a
-/// list of tappable cards, each annotated with an AI "suitability" score so
-/// the user can judge how well a room fits before continuing.
+/// Presents the AI-detected rooms (the `Room` rows a backend pipeline wrote
+/// for [floorPlan]) as an interactive top-down diagram plus a list of
+/// tappable cards, each annotated with an AI "suitability" score derived
+/// from its best `Layout.Score` so the user can judge how well a room fits
+/// before continuing.
 class RoomSelectionScreen extends StatefulWidget {
-  const RoomSelectionScreen({super.key});
+  const RoomSelectionScreen({required this.floorPlan, super.key});
+
+  final FloorPlanRecord floorPlan;
 
   @override
   State<RoomSelectionScreen> createState() => _RoomSelectionScreenState();
@@ -34,6 +38,7 @@ AppStatus _scoreStatus(int score) {
 
 class _DetectedRoom {
   const _DetectedRoom({
+    required this.roomId,
     required this.name,
     required this.icon,
     required this.accent,
@@ -42,14 +47,19 @@ class _DetectedRoom {
     required this.note,
   });
 
+  /// The real `Room.RoomID` this card represents.
+  final String roomId;
   final String name;
   final IconData icon;
   final _RoomAccent accent;
 
-  /// Fractional bounds (0-1) within the floor plan diagram.
+  /// Fractional bounds (0-1) within the floor plan diagram. The schema has
+  /// no per-room position, so these are laid out in a simple grid rather
+  /// than reflecting the plan's true geometry.
   final Rect bounds;
 
-  /// AI confidence/suitability score out of 100.
+  /// Best `Layout.Score` found for this room (0-100), or 0 if no AI layout
+  /// has been generated for it yet.
   final int suitability;
   final String note;
 
@@ -58,74 +68,170 @@ class _DetectedRoom {
   String get tag {
     if (suitability >= 90) return 'Excellent fit';
     if (suitability >= 75) return 'Great fit';
-    return 'Good fit';
+    if (suitability > 0) return 'Good fit';
+    return 'Not yet scored';
   }
 }
 
-const _detectedRooms = [
-  _DetectedRoom(
-    name: 'Living Room',
-    icon: Icons.weekend_outlined,
-    accent: _RoomAccent.primary,
-    bounds: Rect.fromLTWH(0, 0, .58, .62),
-    suitability: 96,
-    note: 'Bright, open layout — ideal for a statement centerpiece.',
-  ),
-  _DetectedRoom(
-    name: 'Kitchen',
-    icon: Icons.kitchen_outlined,
-    accent: _RoomAccent.accent,
-    bounds: Rect.fromLTWH(.6, 0, .4, .38),
-    suitability: 88,
-    note: 'Efficient galley shape close to the dining area.',
-  ),
-  _DetectedRoom(
-    name: 'Bedroom',
-    icon: Icons.bed_outlined,
-    accent: _RoomAccent.secondary,
-    bounds: Rect.fromLTWH(.6, .42, .4, .58),
-    suitability: 74,
-    note: 'Cozy corner room with limited natural light.',
-  ),
-];
+IconData _iconForRoomType(String roomType) {
+  final type = roomType.toLowerCase();
+  if (type.contains('living')) return Icons.weekend_outlined;
+  if (type.contains('kitchen')) return Icons.kitchen_outlined;
+  if (type.contains('bed')) return Icons.bed_outlined;
+  if (type.contains('bath')) return Icons.bathtub_outlined;
+  if (type.contains('dining')) return Icons.dining_outlined;
+  if (type.contains('office') || type.contains('study')) {
+    return Icons.desk_outlined;
+  }
+  if (type.contains('garage')) return Icons.garage_outlined;
+  if (type.contains('hall')) return Icons.door_sliding_outlined;
+  if (type.contains('balcony') || type.contains('patio')) {
+    return Icons.balcony_outlined;
+  }
+  return Icons.meeting_room_outlined;
+}
+
+/// Lays out detected rooms in a simple grid, since the schema has no
+/// per-room position within the source image.
+Rect _boundsForIndex(int index, int total) {
+  final columns = math.max(1, math.sqrt(total).ceil());
+  final rows = (total / columns).ceil();
+  final col = index % columns;
+  final row = index ~/ columns;
+  const gap = 0.03;
+  final w = (1 - gap * (columns - 1)) / columns;
+  final h = (1 - gap * (rows - 1)) / rows;
+  return Rect.fromLTWH(col * (w + gap), row * (h + gap), w, h);
+}
+
+Future<List<_DetectedRoom>> _loadDetectedRooms(
+  FloorPlanRecord floorPlan,
+  AppColors c,
+) async {
+  final rooms = await FloorPlanRepository.instance.fetchRooms(
+    floorPlan.floorPlanId,
+  );
+  final accents = _RoomAccent.values;
+  final result = <_DetectedRoom>[];
+  for (final (i, room) in rooms.indexed) {
+    final layouts = await FloorPlanRepository.instance.fetchLayouts(
+      room.roomId,
+    );
+    final bestScore = layouts.isEmpty
+        ? 0
+        : layouts.first.score.round().clamp(0, 100);
+    result.add(
+      _DetectedRoom(
+        roomId: room.roomId,
+        name: room.roomType,
+        icon: _iconForRoomType(room.roomType),
+        accent: accents[i % accents.length],
+        bounds: _boundsForIndex(i, rooms.length),
+        suitability: bestScore,
+        note:
+            '${room.length.toStringAsFixed(1)}m × '
+            '${room.width.toStringAsFixed(1)}m · '
+            '${room.area.toStringAsFixed(1)} m² floor area',
+      ),
+    );
+  }
+  return result;
+}
 
 class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   int _selected = 0;
+  List<_DetectedRoom>? _rooms;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_rooms == null) _load();
+  }
+
+  Future<void> _load() async {
+    final rooms = await _loadDetectedRooms(widget.floorPlan, context.colors);
+    if (!mounted) return;
+    setState(() => _rooms = rooms);
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final text = context.text;
-    final room = _detectedRooms[_selected];
     final wide = !context.screenSize.isMobile;
+    final rooms = _rooms;
 
-    final diagram = _FloorPlanDiagram(
-      rooms: _detectedRooms,
-      selected: _selected,
-      onSelect: (i) => setState(() => _selected = i),
-    );
-    final list = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Detected rooms', style: text.titleMedium),
-        const SizedBox(height: AppSpacing.md),
-        for (var i = 0; i < _detectedRooms.length; i++) ...[
-          _RoomCard(
-            room: _detectedRooms[i],
-            selected: i == _selected,
-            onTap: () => setState(() => _selected = i),
+    Widget body;
+    if (rooms == null) {
+      body = const Padding(
+        padding: EdgeInsets.symmetric(vertical: AppSpacing.huge),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
+      );
+    } else if (rooms.isEmpty) {
+      body = Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.huge),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.search_off_rounded, color: c.textMuted, size: 46),
+              const SizedBox(height: AppSpacing.lg),
+              Text('No rooms detected yet', style: text.titleSmall),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'Check back shortly once analysis finishes.',
+                style: text.bodySmall?.copyWith(color: c.textMuted),
+              ),
+            ],
           ),
-          if (i != _detectedRooms.length - 1)
-            const SizedBox(height: AppSpacing.md),
-        ],
-        const SizedBox(height: AppSpacing.xl),
-        AppButton(
-          label: 'Design the ${room.name}',
-          icon: Icons.auto_awesome_rounded,
-          onPressed: () => _openLayouts(context, room),
         ),
-      ],
-    );
+      );
+    } else {
+      final room = rooms[_selected.clamp(0, rooms.length - 1)];
+      final diagram = _FloorPlanDiagram(
+        rooms: rooms,
+        selected: _selected,
+        onSelect: (i) => setState(() => _selected = i),
+      );
+      final list = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Detected rooms', style: text.titleMedium),
+          const SizedBox(height: AppSpacing.md),
+          for (var i = 0; i < rooms.length; i++) ...[
+            _RoomCard(
+              room: rooms[i],
+              selected: i == _selected,
+              onTap: () => setState(() => _selected = i),
+            ),
+            if (i != rooms.length - 1) const SizedBox(height: AppSpacing.md),
+          ],
+          const SizedBox(height: AppSpacing.xl),
+          AppButton(
+            label: 'Design the ${room.name}',
+            icon: Icons.auto_awesome_rounded,
+            onPressed: () => _openLayouts(context, room),
+          ),
+        ],
+      );
+
+      body = wide
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 5, child: diagram),
+                const SizedBox(width: AppSpacing.xxl),
+                Expanded(flex: 4, child: list),
+              ],
+            )
+          : Column(
+              children: [
+                diagram,
+                const SizedBox(height: AppSpacing.xl),
+                list,
+              ],
+            );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -146,7 +252,10 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                   const _AiPill(),
                   const SizedBox(height: AppSpacing.md),
                   Text(
-                    'We found 3 rooms',
+                    rooms == null
+                        ? 'Looking at your floor plan'
+                        : 'We found ${rooms.length} room'
+                              '${rooms.length == 1 ? '' : 's'}',
                     style: context.responsive(
                       mobile: text.headlineMedium,
                       tablet: text.headlineLarge,
@@ -159,20 +268,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                     style: text.bodyMedium?.copyWith(color: c.textSecondary),
                   ),
                   const SizedBox(height: AppSpacing.xl),
-                  if (wide)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(flex: 5, child: diagram),
-                        const SizedBox(width: AppSpacing.xxl),
-                        Expanded(flex: 4, child: list),
-                      ],
-                    )
-                  else ...[
-                    diagram,
-                    const SizedBox(height: AppSpacing.xl),
-                    list,
-                  ],
+                  body,
                 ],
               ),
             ),
@@ -183,6 +279,10 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   }
 
   void _openLayouts(BuildContext context, _DetectedRoom room) {
+    FloorPlanRepository.instance.selectRoomForAnalysis(
+      floorPlanId: widget.floorPlan.floorPlanId,
+      roomId: room.roomId,
+    );
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => LayoutsScreen(room: room)),
     );
