@@ -13,6 +13,19 @@ class ProjectsScreen extends StatefulWidget {
 class _ProjectsScreenState extends State<ProjectsScreen> {
   final _searchController = TextEditingController();
   String _query = '';
+  List<_ProjectView>? _projects;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_projects == null) _load();
+  }
+
+  Future<void> _load() async {
+    final projects = await _loadUserProjects(context.colors);
+    if (!mounted) return;
+    setState(() => _projects = projects);
+  }
 
   @override
   void dispose() {
@@ -24,9 +37,11 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final text = context.text;
-    final projects = _mockProjects(c);
+    final projects = _projects;
     final query = _query.trim().toLowerCase();
-    final results = query.isEmpty
+    final results = projects == null
+        ? null
+        : query.isEmpty
         ? projects
         : projects.where((p) => p.title.toLowerCase().contains(query)).toList();
 
@@ -39,57 +54,78 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         tooltip: 'New project',
         child: const Icon(Icons.add_rounded, size: 28),
       ),
-      body: SingleChildScrollView(
-        child: AppContentFrame(
-          bottomInset: context.screenSize.isMobile ? 72 : 0,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${projects.length} project${projects.length == 1 ? '' : 's'}',
-                style: text.headlineSmall,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Every floor plan you have turned into an AI design.',
-                style: text.bodyMedium?.copyWith(color: c.textSecondary),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              AppInputField(
-                controller: _searchController,
-                onChanged: (v) => setState(() => _query = v),
-                hintText: 'Search projects',
-                prefixIcon: Icons.search_rounded,
-                suffixIcon: _searchController.text.isEmpty
-                    ? null
-                    : IconButton(
-                        tooltip: 'Clear search',
-                        icon: const Icon(Icons.close_rounded, size: 18),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _query = '');
-                        },
-                      ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              if (results.isEmpty)
-                _NoResults(query: _query)
-              else
-                AppResponsiveGrid(
-                  mobileColumns: 2,
-                  tabletColumns: 3,
-                  desktopColumns: 4,
-                  childAspectRatio: context.responsive(
-                    mobile: 0.88,
-                    tablet: 1.0,
-                    desktop: 1.1,
-                  ),
-                  children: [
-                    for (final (index, project) in results.indexed)
-                      _ProjectCard(project: project, planIndex: index),
-                  ],
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: AppContentFrame(
+            bottomInset: context.screenSize.isMobile ? 72 : 0,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  projects == null
+                      ? 'Loading projects'
+                      : '${projects.length} project${projects.length == 1 ? '' : 's'}',
+                  style: text.headlineSmall,
                 ),
-            ],
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Every floor plan you have turned into an AI design.',
+                  style: text.bodyMedium?.copyWith(color: c.textSecondary),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                AppInputField(
+                  controller: _searchController,
+                  onChanged: (v) => setState(() => _query = v),
+                  hintText: 'Search projects',
+                  prefixIcon: Icons.search_rounded,
+                  suffixIcon: _searchController.text.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Clear search',
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _query = '');
+                          },
+                        ),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                if (results == null)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+                    child: Center(
+                      child: CircularProgressIndicator(strokeWidth: 2.4),
+                    ),
+                  )
+                else if (results.isEmpty)
+                  _query.isEmpty
+                      ? _EmptyProjects(
+                          onUpload: () => _switchTab(context, 2),
+                        )
+                      : _NoResults(query: _query)
+                else
+                  AppResponsiveGrid(
+                    mobileColumns: 2,
+                    tabletColumns: 3,
+                    desktopColumns: 4,
+                    childAspectRatio: context.responsive(
+                      mobile: 0.88,
+                      tablet: 1.0,
+                      desktop: 1.1,
+                    ),
+                    children: [
+                      for (final (index, project) in results.indexed)
+                        _ProjectCard(
+                          project: project,
+                          planIndex: index,
+                          onTap: () => _openProject(context, project.record),
+                        ),
+                    ],
+                  ),
+              ],
+            ),
           ),
         ),
       ),

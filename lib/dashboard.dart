@@ -82,8 +82,114 @@ class _TabScaffold extends StatelessWidget {
   }
 }
 
-class DashboardScreen extends StatelessWidget {
+/// A floor plan dressed up for grid display: a color pulled cyclically from
+/// the theme (the table has no color column) and, when the private storage
+/// object resolved, a short-lived signed URL to its image.
+class _ProjectView {
+  const _ProjectView({required this.record, required this.accent, this.imageUrl});
+
+  final FloorPlanRecord record;
+  final Color accent;
+  final String? imageUrl;
+
+  String get title => record.displayTitle;
+  String get dateLabel => _formatRelativeDate(record.uploadDateTime);
+}
+
+String _formatRelativeDate(DateTime dateTime) {
+  final local = dateTime.toLocal();
+  final now = DateTime.now();
+  final diff = now.difference(local);
+  if (diff.inMinutes < 1) return 'Just now';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+  if (diff.inHours < 24 && local.day == now.day) return '${diff.inHours}h ago';
+  final yesterday = now.subtract(const Duration(days: 1));
+  if (local.year == yesterday.year &&
+      local.month == yesterday.month &&
+      local.day == yesterday.day) {
+    return 'Yesterday';
+  }
+  if (diff.inDays < 7) return '${diff.inDays}d ago';
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  return '${months[local.month - 1]} ${local.day}, ${local.year}';
+}
+
+/// Loads the signed-in user's floor plans and resolves a short-lived signed
+/// URL for each image, since the storage bucket is private.
+Future<List<_ProjectView>> _loadUserProjects(AppColors c) async {
+  final user = AuthService.instance.currentUser;
+  if (user == null) return const [];
+  final records = await FloorPlanRepository.instance.fetchUserFloorPlans(
+    user.id,
+  );
+  final accents = [c.primary, c.accent, c.secondary, c.warning];
+  final urls = await Future.wait(
+    records.map((r) async {
+      try {
+        return await FloorPlanRepository.instance.signedUrlFor(r.imagePath);
+      } catch (_) {
+        return null;
+      }
+    }),
+  );
+  return [
+    for (final (i, record) in records.indexed)
+      _ProjectView(
+        record: record,
+        accent: accents[i % accents.length],
+        imageUrl: urls[i],
+      ),
+  ];
+}
+
+/// Opens the right next step for a floor plan: the processing screen if its
+/// AI analysis isn't ready yet (it will forward on automatically once it
+/// is), or straight to room selection if rooms are already detected.
+void _openProject(BuildContext context, FloorPlanRecord record) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => ProcessingScreen(floorPlan: record),
+    ),
+  );
+}
+
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  AppUserProfile? _profile;
+  bool _isAdmin = false;
+  List<_ProjectView>? _projects;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_profile == null && _projects == null) _load();
+  }
+
+  Future<void> _load() async {
+    final user = AuthService.instance.currentUser;
+    if (user == null) return;
+    final c = context.colors;
+    final results = await Future.wait([
+      UserRepository.instance.fetchProfile(user.id),
+      AuthService.instance.isAdmin(),
+      _loadUserProjects(c),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _profile = results[0] as AppUserProfile?;
+      _isAdmin = results[1] as bool;
+      _projects = results[2] as List<_ProjectView>;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,12 +201,22 @@ class DashboardScreen extends StatelessWidget {
         tooltip: 'New upload',
         child: const Icon(Icons.add_rounded, size: 28),
       ),
-      body: _DashboardContent(
-        size: context.screenSize,
-        onSeeAll: () => _switchTab(context, 1),
-        onAvatarTap: () => _switchTab(context, 3),
-        onAdminTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const AdminAccountsScreen()),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: _DashboardContent(
+          size: context.screenSize,
+          profile: _profile,
+          isAdmin: _isAdmin,
+          projects: _projects,
+          onSeeAll: () => _switchTab(context, 1),
+          onUpload: () => _switchTab(context, 2),
+          onAvatarTap: () => _switchTab(context, 3),
+          onProjectTap: (p) => _openProject(context, p.record),
+          onAdminTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const AdminAccountsScreen(),
+            ),
+          ),
         ),
       ),
     );
@@ -110,37 +226,54 @@ class DashboardScreen extends StatelessWidget {
 class _DashboardContent extends StatelessWidget {
   const _DashboardContent({
     required this.size,
+    required this.profile,
+    required this.isAdmin,
+    required this.projects,
     required this.onSeeAll,
+    required this.onUpload,
     required this.onAvatarTap,
+    required this.onProjectTap,
     required this.onAdminTap,
   });
 
   final ScreenSize size;
+  final AppUserProfile? profile;
+  final bool isAdmin;
+  final List<_ProjectView>? projects;
   final VoidCallback onSeeAll;
+  final VoidCallback onUpload;
   final VoidCallback onAvatarTap;
+  final ValueChanged<_ProjectView> onProjectTap;
   final VoidCallback onAdminTap;
 
   @override
   Widget build(BuildContext context) {
-    const hero = _HeroBanner();
+    final hero = _HeroBanner(onUpload: onUpload);
+    final recent = projects?.take(4).toList();
 
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       child: AppContentFrame(
         // Keeps the last row clear of the mobile floating action button.
         bottomInset: size.isMobile ? 72 : 0,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Header(onAvatarTap: onAvatarTap, onAdminTap: onAdminTap),
+            _Header(
+              profile: profile,
+              isAdmin: isAdmin,
+              onAvatarTap: onAvatarTap,
+              onAdminTap: onAdminTap,
+            ),
             const SizedBox(height: AppSpacing.xxl),
             if (size.isDesktop)
-              const IntrinsicHeight(
+              IntrinsicHeight(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Expanded(flex: 5, child: hero),
-                    SizedBox(width: AppSpacing.xl),
-                    Expanded(flex: 2, child: _TipCard(vertical: true)),
+                    const SizedBox(width: AppSpacing.xl),
+                    const Expanded(flex: 2, child: _TipCard(vertical: true)),
                   ],
                 ),
               )
@@ -153,7 +286,11 @@ class _DashboardContent extends StatelessWidget {
               onAction: onSeeAll,
             ),
             const SizedBox(height: AppSpacing.lg),
-            const _ProjectGrid(),
+            _ProjectGrid(
+              projects: recent,
+              emptyAction: onUpload,
+              onTap: onProjectTap,
+            ),
             if (!size.isDesktop) ...[
               const SizedBox(height: AppSpacing.xxl),
               const _TipCard(),
@@ -214,9 +351,23 @@ class _SideNav extends StatelessWidget {
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header({required this.onAvatarTap, required this.onAdminTap});
+String _greeting() {
+  final hour = DateTime.now().hour;
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
 
+class _Header extends StatelessWidget {
+  const _Header({
+    required this.profile,
+    required this.isAdmin,
+    required this.onAvatarTap,
+    required this.onAdminTap,
+  });
+
+  final AppUserProfile? profile;
+  final bool isAdmin;
   final VoidCallback onAvatarTap;
   final VoidCallback onAdminTap;
 
@@ -224,6 +375,7 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final text = context.text;
+    final firstName = profile?.fullName.trim().split(RegExp(r'\s+')).first;
 
     IconButton actionButton({
       required IconData icon,
@@ -261,7 +413,7 @@ class _Header extends StatelessWidget {
                 dimension: 48,
                 child: Center(
                   child: Text(
-                    'JM',
+                    profile?.initials ?? '',
                     style: text.labelLarge?.copyWith(color: c.onPrimary),
                   ),
                 ),
@@ -275,7 +427,7 @@ class _Header extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Good morning, Jamie',
+                firstName == null ? _greeting() : '${_greeting()}, $firstName',
                 style: context.responsive(
                   mobile: text.titleMedium,
                   tablet: text.titleLarge,
@@ -288,12 +440,14 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
-        actionButton(
-          icon: Icons.admin_panel_settings_outlined,
-          tooltip: 'Manage accounts',
-          onPressed: onAdminTap,
-        ),
-        const SizedBox(width: AppSpacing.sm),
+        if (isAdmin) ...[
+          actionButton(
+            icon: Icons.admin_panel_settings_outlined,
+            tooltip: 'Manage accounts',
+            onPressed: onAdminTap,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+        ],
         actionButton(
           icon: Icons.notifications_none_rounded,
           tooltip: 'Notifications',
@@ -305,7 +459,9 @@ class _Header extends StatelessWidget {
 }
 
 class _HeroBanner extends StatelessWidget {
-  const _HeroBanner();
+  const _HeroBanner({required this.onUpload});
+
+  final VoidCallback onUpload;
 
   @override
   Widget build(BuildContext context) {
@@ -395,7 +551,7 @@ class _HeroBanner extends StatelessWidget {
                         label: 'Upload floor plan',
                         icon: Icons.cloud_upload_outlined,
                         expanded: false,
-                        onPressed: () {},
+                        onPressed: onUpload,
                       ),
                     ],
                   ],
@@ -424,76 +580,30 @@ class _AiPill extends StatelessWidget {
   }
 }
 
-class _Project {
-  const _Project(this.title, this.date, this.accent, this.imageUrl);
-
-  final String title;
-  final String date;
-  final Color accent;
-  final String imageUrl;
-}
-
-/// Mock project data shared by the dashboard's "Recent Projects" preview and
-/// the full [ProjectsScreen] list. There is no backend yet, so this stands in
-/// for a user's saved projects.
-List<_Project> _mockProjects(AppColors c) => [
-  _Project(
-    'Loft Apartment',
-    'Just now',
-    c.primary,
-    'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=900&q=85',
-  ),
-  _Project(
-    'Coastal Retreat',
-    'Yesterday',
-    c.accent,
-    'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=900&q=85',
-  ),
-  _Project(
-    'Studio Workspace',
-    'Aug 24, 2024',
-    c.secondary,
-    'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=85',
-  ),
-  _Project(
-    'Family Residence',
-    'Aug 18, 2024',
-    c.warning,
-    'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=900&q=85',
-  ),
-  _Project(
-    'Downtown Penthouse',
-    'Aug 12, 2024',
-    c.primary,
-    'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=900&q=85',
-  ),
-  _Project(
-    'Garden Bungalow',
-    'Aug 5, 2024',
-    c.accent,
-    'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=900&q=85',
-  ),
-  _Project(
-    'Minimalist Studio',
-    'Jul 29, 2024',
-    c.secondary,
-    'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=900&q=85',
-  ),
-  _Project(
-    'Rooftop Lounge',
-    'Jul 21, 2024',
-    c.warning,
-    'https://images.unsplash.com/photo-1615873968403-89e068629265?auto=format&fit=crop&w=900&q=85',
-  ),
-];
-
 class _ProjectGrid extends StatelessWidget {
-  const _ProjectGrid();
+  const _ProjectGrid({
+    required this.projects,
+    required this.emptyAction,
+    required this.onTap,
+  });
+
+  /// Null while still loading; empty once loaded with nothing to show.
+  final List<_ProjectView>? projects;
+  final VoidCallback emptyAction;
+  final ValueChanged<_ProjectView> onTap;
 
   @override
   Widget build(BuildContext context) {
-    // The dashboard only teases recent work; "See all" opens the full list.
-    final projects = _mockProjects(context.colors).take(4).toList();
+    final list = projects;
+    if (list == null) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
+      );
+    }
+    if (list.isEmpty) {
+      return _EmptyProjects(onUpload: emptyAction);
+    }
 
     return AppResponsiveGrid(
       mobileColumns: 2,
@@ -505,36 +615,94 @@ class _ProjectGrid extends StatelessWidget {
         desktop: 1.1,
       ),
       children: [
-        for (final (index, project) in projects.indexed)
-          _ProjectCard(project: project, planIndex: index),
+        for (final (index, project) in list.indexed)
+          _ProjectCard(
+            project: project,
+            planIndex: index,
+            onTap: () => onTap(project),
+          ),
       ],
     );
   }
 }
 
-class _ProjectCard extends StatelessWidget {
-  const _ProjectCard({required this.project, required this.planIndex});
+class _EmptyProjects extends StatelessWidget {
+  const _EmptyProjects({required this.onUpload});
 
-  final _Project project;
+  final VoidCallback onUpload;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.xxl),
+      child: Column(
+        children: [
+          Icon(Icons.grid_view_rounded, color: c.textMuted, size: 40),
+          const SizedBox(height: AppSpacing.md),
+          Text('No projects yet', style: context.text.titleSmall),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Upload a floor plan to start your first AI design.',
+            textAlign: TextAlign.center,
+            style: context.text.bodySmall?.copyWith(color: c.textMuted),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          AppButton(
+            label: 'Upload floor plan',
+            icon: Icons.cloud_upload_outlined,
+            expanded: false,
+            onPressed: onUpload,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProjectCard extends StatelessWidget {
+  const _ProjectCard({
+    required this.project,
+    required this.planIndex,
+    required this.onTap,
+  });
+
+  final _ProjectView project;
   final int planIndex;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final text = context.text;
+    final imageUrl = project.imageUrl;
 
     return AppCard(
       padding: EdgeInsets.zero,
-      onTap: () {},
+      onTap: onTap,
       child: ClipRRect(
         borderRadius: AppRadius.lgAll,
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Image.network(
-              project.imageUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => ColoredBox(
+            if (imageUrl != null)
+              Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => ColoredBox(
+                  color: c.surfaceElevated,
+                  child: CustomPaint(
+                    painter: _PlanPainter(
+                      accent: project.accent,
+                      lineColor: c.textPrimary,
+                      variant: planIndex,
+                    ),
+                  ),
+                ),
+              )
+            else
+              ColoredBox(
                 color: c.surfaceElevated,
                 child: CustomPaint(
                   painter: _PlanPainter(
@@ -544,7 +712,6 @@ class _ProjectCard extends StatelessWidget {
                   ),
                 ),
               ),
-            ),
             DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -589,7 +756,7 @@ class _ProjectCard extends StatelessWidget {
                               const SizedBox(width: AppSpacing.xs),
                               Flexible(
                                 child: Text(
-                                  project.date,
+                                  project.dateLabel,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: text.labelSmall?.copyWith(

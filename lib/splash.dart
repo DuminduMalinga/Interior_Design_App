@@ -1,9 +1,8 @@
 part of 'main.dart';
 
 /// First thing the app shows: the logo and a brief loading line, then it
-/// hands off to [WelcomeScreen]. There is nothing to actually wait on yet
-/// (no backend, no cached session) — this exists to give the brand a beat
-/// on screen before the "Get Started" flow, the way a native splash would.
+/// hands off to [DashboardScreen] if a Supabase session is already cached
+/// on this device, or [WelcomeScreen] otherwise.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -19,7 +18,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _timer = Timer(_holdDuration, _openWelcome);
+    _timer = Timer(_holdDuration, _openNext);
   }
 
   @override
@@ -28,10 +27,14 @@ class _SplashScreenState extends State<SplashScreen> {
     super.dispose();
   }
 
-  void _openWelcome() {
+  void _openNext() {
     if (!mounted) return;
+    final signedIn = AuthService.instance.isSignedIn;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const WelcomeScreen()),
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            signedIn ? const DashboardScreen() : const WelcomeScreen(),
+      ),
     );
   }
 

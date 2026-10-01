@@ -9,41 +9,82 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
+String _monthYear(DateTime dt) {
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  return '${months[dt.month - 1]} ${dt.year}';
+}
+
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _notificationsEnabled = true;
+  AppUserProfile? _profile;
+  bool _isAdmin = false;
+  ({int projects, int rooms})? _stats;
+  DeletionRequestRecord? _deletionRequest;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_profile == null) _load();
+  }
+
+  Future<void> _load() async {
+    final user = AuthService.instance.currentUser;
+    if (user == null) return;
+    final results = await Future.wait([
+      UserRepository.instance.fetchProfile(user.id),
+      UserRepository.instance.fetchStats(user.id),
+      AuthService.instance.isAdmin(),
+      UserRepository.instance.fetchOwnDeletionRequest(user.id),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _profile = results[0] as AppUserProfile?;
+      _stats = results[1] as ({int projects, int rooms});
+      _isAdmin = results[2] as bool;
+      _deletionRequest = results[3] as DeletionRequestRecord?;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final wide = !context.screenSize.isMobile;
+    final user = AuthService.instance.currentUser;
+    final profile = _profile;
+    final stats = _stats;
 
-    const header = _ProfileHeader(
-      name: 'Jamie Morgan',
-      email: 'jamie.morgan@gmail.com',
-      initials: 'JM',
+    final header = _ProfileHeader(
+      name: profile?.fullName ?? 'Loading...',
+      email: profile?.email ?? user?.email ?? '',
+      initials: profile?.initials ?? '?',
     );
-    const stats = Row(
+    final statsRow = Row(
       children: [
         Expanded(
           child: _ProfileStat(
             icon: Icons.grid_view_rounded,
-            value: '12',
+            value: '${stats?.projects ?? '—'}',
             label: 'Projects',
           ),
         ),
-        SizedBox(width: AppSpacing.md),
+        const SizedBox(width: AppSpacing.md),
         Expanded(
           child: _ProfileStat(
             icon: Icons.meeting_room_outlined,
-            value: '34',
+            value: '${stats?.rooms ?? '—'}',
             label: 'Rooms designed',
           ),
         ),
-        SizedBox(width: AppSpacing.md),
+        const SizedBox(width: AppSpacing.md),
         Expanded(
           child: _ProfileStat(
             icon: Icons.calendar_today_outlined,
-            value: 'Sep 2026',
+            value: user?.createdAt == null
+                ? '—'
+                : _monthYear(DateTime.parse(user!.createdAt)),
             label: 'Member since',
           ),
         ),
@@ -59,7 +100,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _SettingsTile(
               icon: Icons.person_outline_rounded,
               title: 'Edit profile',
-              onTap: () => _notify(context, 'Edit profile'),
+              onTap: profile == null
+                  ? null
+                  : () => _editProfile(context, profile),
             ),
             _SettingsTile(
               icon: Icons.notifications_none_rounded,
@@ -78,22 +121,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ],
         ),
-        const SizedBox(height: AppSpacing.xl),
-        const _SectionLabel('Admin'),
-        _SettingsGroup(
-          children: [
-            _SettingsTile(
-              icon: Icons.admin_panel_settings_outlined,
-              title: 'Manage accounts',
-              subtitle: 'Review and approve sign-ups',
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const AdminAccountsScreen(),
+        if (_isAdmin) ...[
+          const SizedBox(height: AppSpacing.xl),
+          const _SectionLabel('Admin'),
+          _SettingsGroup(
+            children: [
+              _SettingsTile(
+                icon: Icons.admin_panel_settings_outlined,
+                title: 'Manage accounts',
+                subtitle: 'Review account deletion requests',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const AdminAccountsScreen(),
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
         const SizedBox(height: AppSpacing.xl),
         const _SectionLabel('Support'),
         _SettingsGroup(
@@ -108,6 +153,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
               title: 'About LiviSpace',
               subtitle: 'Version 1.0.0',
               onTap: () => _notify(context, 'About'),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        const _SectionLabel('Danger zone'),
+        _SettingsGroup(
+          children: [
+            _SettingsTile(
+              icon: Icons.delete_outline_rounded,
+              title: _deletionRequest?.status == DeletionStatus.pending
+                  ? 'Account deletion requested'
+                  : 'Delete my account',
+              subtitle: _deletionRequest?.status == DeletionStatus.pending
+                  ? 'An admin will review your request'
+                  : 'Submit a request for an admin to review',
+              onTap: (profile == null ||
+                      _deletionRequest?.status == DeletionStatus.pending)
+                  ? null
+                  : () => _requestDeletion(context, profile),
             ),
           ],
         ),
@@ -128,37 +192,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return _TabScaffold(
       selectedIndex: 3,
       appBar: AppBar(title: const Text('Profile')),
-      body: SingleChildScrollView(
-        child: AppContentFrame(
-          child: wide
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Expanded(
-                      flex: 4,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          header,
-                          SizedBox(height: AppSpacing.xl),
-                          stats,
-                        ],
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: AppContentFrame(
+            child: wide
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 4,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            header,
+                            const SizedBox(height: AppSpacing.xl),
+                            statsRow,
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: AppSpacing.xxl),
-                    Expanded(flex: 5, child: settings),
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    header,
-                    const SizedBox(height: AppSpacing.xl),
-                    stats,
-                    const SizedBox(height: AppSpacing.xxl),
-                    settings,
-                  ],
-                ),
+                      const SizedBox(width: AppSpacing.xxl),
+                      Expanded(flex: 5, child: settings),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      header,
+                      const SizedBox(height: AppSpacing.xl),
+                      statsRow,
+                      const SizedBox(height: AppSpacing.xxl),
+                      settings,
+                    ],
+                  ),
+          ),
         ),
       ),
     );
@@ -170,11 +238,186 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ).showSnackBar(SnackBar(content: Text('$feature coming soon.')));
   }
 
-  void _signOut(BuildContext context) {
+  Future<void> _editProfile(
+    BuildContext context,
+    AppUserProfile profile,
+  ) async {
+    final updated = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EditProfileSheet(profile: profile),
+    );
+    if (updated == true) _load();
+  }
+
+  Future<void> _requestDeletion(
+    BuildContext context,
+    AppUserProfile profile,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete your account?'),
+        content: const Text(
+          "This sends a request to an admin to permanently delete your "
+          "account. You'll keep access until it's approved.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Request deletion'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await UserRepository.instance.requestAccountDeletion(profile);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Deletion request submitted.')),
+      );
+      _load();
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not submit request: $error')));
+    }
+  }
+
+  Future<void> _signOut(BuildContext context) async {
+    await AuthService.instance.signOut();
+    if (!context.mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const AuthScreen()),
       (route) => false,
     );
+  }
+}
+
+/// A small bottom-sheet form for editing the mutable fields on `User`.
+class _EditProfileSheet extends StatefulWidget {
+  const _EditProfileSheet({required this.profile});
+
+  final AppUserProfile profile;
+
+  @override
+  State<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends State<_EditProfileSheet> {
+  late final _fullNameController = TextEditingController(
+    text: widget.profile.fullName,
+  );
+  late final _bioController = TextEditingController(
+    text: widget.profile.bio ?? '',
+  );
+  late final _locationController = TextEditingController(
+    text: widget.profile.location ?? '',
+  );
+  late final _phoneController = TextEditingController(
+    text: widget.profile.phone ?? '',
+  );
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _bioController.dispose();
+    _locationController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: c.backgroundElevated,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppRadius.xl),
+          ),
+          border: Border.all(color: c.border),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Edit profile', style: context.text.titleLarge),
+                const SizedBox(height: AppSpacing.lg),
+                AppInputField(
+                  controller: _fullNameController,
+                  hintText: 'Full name',
+                  prefixIcon: Icons.badge_outlined,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppInputField(
+                  controller: _bioController,
+                  hintText: 'Bio',
+                  prefixIcon: Icons.notes_rounded,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppInputField(
+                  controller: _locationController,
+                  hintText: 'Location',
+                  prefixIcon: Icons.place_outlined,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppInputField(
+                  controller: _phoneController,
+                  hintText: 'Phone',
+                  prefixIcon: Icons.call_outlined,
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                AppButton(
+                  label: 'Save changes',
+                  loading: _saving,
+                  onPressed: _save,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      await UserRepository.instance.updateProfile(
+        userId: widget.profile.userId,
+        fullName: _fullNameController.text.trim(),
+        bio: _bioController.text.trim(),
+        location: _locationController.text.trim(),
+        phone: _phoneController.text.trim(),
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not save: $error')));
+    }
   }
 }
 
