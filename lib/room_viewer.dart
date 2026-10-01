@@ -68,6 +68,7 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
                       variant: layout.variant,
                       yaw: _yaw,
                       zoom: _zoom,
+                      placedFurniture: layout.furniture,
                     ),
                     size: Size.infinite,
                   ),
@@ -336,6 +337,7 @@ class _IsoRoomPainter extends CustomPainter {
     required this.variant,
     required this.yaw,
     required this.zoom,
+    this.placedFurniture = const [],
   });
 
   final Color accent;
@@ -345,9 +347,36 @@ class _IsoRoomPainter extends CustomPainter {
   final double yaw;
   final double zoom;
 
+  /// Real `FurnitureLayout`/`Furniture` rows for this layout, when the
+  /// backend has placed any. Falls back to a stylized procedural layout
+  /// (see [_furniture]) when empty, since not every layout has furniture
+  /// placements yet.
+  final List<PlacedFurniture> placedFurniture;
+
   static const _roomW = 200.0;
   static const _roomD = 200.0;
   static const _roomH = 120.0;
+
+  /// Maps real furniture placements (room-relative position/size in meters)
+  /// onto the painter's 0-200 unit room space.
+  List<_FurnitureBox> _realFurnitureBoxes() {
+    const metersToUnits = 40.0; // ~5m room maps across the 200-unit floor.
+    return [
+      for (final item in placedFurniture)
+        if (item.placement.positionX != null && item.placement.positionY != null)
+          _FurnitureBox(
+            (item.placement.positionX! * metersToUnits).clamp(0, _roomW - 4),
+            (item.placement.positionY! * metersToUnits).clamp(0, _roomD - 4),
+            (item.placement.positionX! * metersToUnits +
+                    (item.furniture.width ?? 0.6) * metersToUnits)
+                .clamp(4, _roomW),
+            (item.placement.positionY! * metersToUnits +
+                    (item.furniture.length ?? 0.6) * metersToUnits)
+                .clamp(4, _roomD),
+            36,
+          ),
+    ];
+  }
 
   Offset _project(double x, double y, double z, Size size) {
     final rx = x * math.cos(yaw) - y * math.sin(yaw);
@@ -404,7 +433,10 @@ class _IsoRoomPainter extends CustomPainter {
       _project(0, 0, _roomH, size),
     ], wallPaint);
 
-    final pieces = _furniture[variant % _furniture.length];
+    final real = _realFurnitureBoxes();
+    final pieces = real.isNotEmpty
+        ? real
+        : _furniture[variant % _furniture.length];
     final sorted = [...pieces]
       ..sort((a, b) => (a.x1 + a.y1).compareTo(b.x1 + b.y1));
     for (final p in sorted) {
@@ -481,7 +513,8 @@ class _IsoRoomPainter extends CustomPainter {
       oldDelegate.accent != accent ||
       oldDelegate.floor != floor ||
       oldDelegate.grid != grid ||
-      oldDelegate.variant != variant;
+      oldDelegate.variant != variant ||
+      oldDelegate.placedFurniture != placedFurniture;
 }
 
 class _FurnitureBox {

@@ -17,46 +17,70 @@ class LayoutsScreen extends StatefulWidget {
   State<LayoutsScreen> createState() => _LayoutsScreenState();
 }
 
+/// A generic title/tag "skin" cycled across real [LayoutRecord]s, since the
+/// schema stores only a numeric score per layout, not a name or style tags.
+const _layoutArchetypes = [
+  ('Open & Airy', ['Minimalist', 'Natural light']),
+  ('Warm Gathering', ['Scandinavian', 'Warm woods']),
+  ('Cozy Corner', ['Modern', 'Soft textures']),
+  ('Compact Efficient', ['Space-saving', 'Multi-use']),
+];
+
 class _LayoutOption {
   const _LayoutOption({
+    required this.layoutId,
     required this.title,
     required this.tags,
     required this.matchScore,
     required this.variant,
+    required this.furniture,
   });
 
+  final String layoutId;
   final String title;
   final List<String> tags;
   final int matchScore;
   final int variant;
+  final List<PlacedFurniture> furniture;
+}
+
+Future<List<_LayoutOption>> _loadLayoutOptions(String roomId) async {
+  final layouts = await FloorPlanRepository.instance.fetchLayouts(roomId);
+  final options = <_LayoutOption>[];
+  for (final (i, layout) in layouts.indexed) {
+    final archetype = _layoutArchetypes[i % _layoutArchetypes.length];
+    final furniture = await FloorPlanRepository.instance
+        .fetchFurnitureForLayout(layout.layoutId);
+    options.add(
+      _LayoutOption(
+        layoutId: layout.layoutId,
+        title: archetype.$1,
+        tags: archetype.$2,
+        matchScore: layout.score.round().clamp(0, 100),
+        variant: i,
+        furniture: furniture,
+      ),
+    );
+  }
+  return options;
 }
 
 class _LayoutsScreenState extends State<LayoutsScreen> {
   late final PageController _pageController;
   int _page = 0;
-  late final List<_LayoutOption> _layouts;
-
-  static const _archetypes = [
-    ('Open & Airy', ['Minimalist', 'Natural light']),
-    ('Warm Gathering', ['Scandinavian', 'Warm woods']),
-    ('Cozy Corner', ['Modern', 'Soft textures']),
-    ('Compact Efficient', ['Space-saving', 'Multi-use']),
-  ];
+  List<_LayoutOption>? _layouts;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController(viewportFraction: .86);
-    final base = widget.room.suitability;
-    _layouts = [
-      for (var i = 0; i < _archetypes.length; i++)
-        _LayoutOption(
-          title: _archetypes[i].$1,
-          tags: _archetypes[i].$2,
-          matchScore: (base - i * 6).clamp(52, 99),
-          variant: i,
-        ),
-    ]..sort((a, b) => b.matchScore.compareTo(a.matchScore));
+    _load();
+  }
+
+  Future<void> _load() async {
+    final layouts = await _loadLayoutOptions(widget.room.roomId);
+    if (!mounted) return;
+    setState(() => _layouts = layouts);
   }
 
   @override
@@ -126,15 +150,80 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
       ),
       body: AppBackground(
         child: SafeArea(
-          child: isMobile
-              ? _buildDeck(context, header, roomColor)
-              : _buildGrid(context, header),
+          child: _layouts == null
+              ? _buildLoading(header)
+              : _layouts!.isEmpty
+              ? _buildEmpty(context, header)
+              : isMobile
+              ? _buildDeck(context, header, roomColor, _layouts!)
+              : _buildGrid(context, header, _layouts!),
         ),
       ),
     );
   }
 
-  Widget _buildDeck(BuildContext context, Widget header, Color roomColor) {
+  Widget _buildLoading(Widget header) {
+    return SingleChildScrollView(
+      child: AppContentFrame(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            header,
+            const SizedBox(height: AppSpacing.huge),
+            const Center(
+              child: CircularProgressIndicator(strokeWidth: 2.4),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmpty(BuildContext context, Widget header) {
+    final c = context.colors;
+    return SingleChildScrollView(
+      child: AppContentFrame(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            header,
+            const SizedBox(height: AppSpacing.huge),
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.auto_awesome_outlined,
+                    color: c.textMuted,
+                    size: 46,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    'No AI layouts yet',
+                    style: context.text.titleSmall,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'Layouts for this room are still being generated.',
+                    style: context.text.bodySmall?.copyWith(
+                      color: c.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeck(
+    BuildContext context,
+    Widget header,
+    Color roomColor,
+    List<_LayoutOption> layouts,
+  ) {
     final c = context.colors;
     final room = widget.room;
 
@@ -154,7 +243,7 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
         Expanded(
           child: PageView.builder(
             controller: _pageController,
-            itemCount: _layouts.length,
+            itemCount: layouts.length,
             onPageChanged: (i) => setState(() => _page = i),
             itemBuilder: (context, index) {
               final isActive = index == _page;
@@ -164,7 +253,7 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
                   horizontal: AppSpacing.sm,
                   vertical: isActive ? 0 : AppSpacing.lg,
                 ),
-                child: _LayoutCard(room: room, layout: _layouts[index]),
+                child: _LayoutCard(room: room, layout: layouts[index]),
               );
             },
           ),
@@ -173,7 +262,7 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            for (var i = 0; i < _layouts.length; i++)
+            for (var i = 0; i < layouts.length; i++)
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 margin: const EdgeInsets.symmetric(horizontal: 3),
@@ -191,7 +280,11 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
     );
   }
 
-  Widget _buildGrid(BuildContext context, Widget header) {
+  Widget _buildGrid(
+    BuildContext context,
+    Widget header,
+    List<_LayoutOption> layouts,
+  ) {
     return SingleChildScrollView(
       child: AppContentFrame(
         child: Column(
@@ -209,7 +302,7 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
                 desktop: 0.78,
               ),
               children: [
-                for (final layout in _layouts)
+                for (final layout in layouts)
                   _LayoutCard(room: widget.room, layout: layout),
               ],
             ),
