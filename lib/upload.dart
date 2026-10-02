@@ -30,7 +30,7 @@ class _UploadScreenState extends State<UploadScreen> {
         Text('Accepted formats', style: text.titleMedium),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          'Use a clear image, sketch, or scanned document.',
+          'Use a clear JPG, JPEG or PNG image, up to 10 MB.',
           style: text.bodySmall?.copyWith(color: c.textMuted),
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -90,9 +90,33 @@ class _UploadScreenState extends State<UploadScreen> {
     );
   }
 
+  /// SRS UC4 business rules: JPEG/JPG/PNG only, under 10 MB.
+  static const _allowedExtensions = ['jpg', 'jpeg', 'png'];
+  static const _maxBytes = 10 * 1024 * 1024;
+
   Future<void> _pickFile() async {
-    final file = await FilePicker.pickFile(type: FileType.image);
+    final file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: _allowedExtensions,
+    );
     if (file == null) return;
+
+    final ext = (file.extension ?? file.name.split('.').last).toLowerCase();
+    final size = await file.length();
+    String? problem;
+    if (!_allowedExtensions.contains(ext)) {
+      problem =
+          'Unsupported file type. Please upload a JPG, JPEG or PNG image.';
+    } else if (size != null && size >= _maxBytes) {
+      problem = 'That image is larger than 10 MB. Please choose a smaller one.';
+    }
+    if (problem != null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(problem)));
+      return;
+    }
     setState(() => _picked = file);
   }
 
@@ -123,9 +147,9 @@ class _UploadScreenState extends State<UploadScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _uploading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Upload failed: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Upload failed: $error')));
     }
   }
 
@@ -416,6 +440,7 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
   StreamSubscription<FloorPlanAnalysisRecord?>? _analysisSub;
   int _statusIndex = 0;
   bool _timedOut = false;
+  bool _failed = false;
 
   static const _statuses = [
     'Detecting rooms...',
@@ -431,11 +456,27 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
       duration: const Duration(milliseconds: 2200),
     )..repeat();
     _statusTimer = Timer(const Duration(milliseconds: 1500), _advanceStatus);
+    _startWatching();
+  }
+
+  void _startWatching() {
+    _analysisSub?.cancel();
     _analysisSub = FloorPlanRepository.instance
         .watchAnalysis(widget.floorPlan.floorPlanId)
-        .listen(_onAnalysisUpdate, onDone: () {
-          if (mounted && !_timedOut) setState(() => _timedOut = true);
-        });
+        .listen(
+          _onAnalysisUpdate,
+          onDone: () {
+            if (mounted && !_timedOut) setState(() => _timedOut = true);
+          },
+        );
+  }
+
+  void _checkAgain() {
+    setState(() {
+      _timedOut = false;
+      _failed = false;
+    });
+    _startWatching();
   }
 
   void _advanceStatus() {
@@ -449,7 +490,10 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
     if (analysis.isComplete) {
       _openRoomSelection();
     } else if (analysis.isFailed) {
-      setState(() => _timedOut = true);
+      setState(() {
+        _timedOut = true;
+        _failed = true;
+      });
     }
   }
 
@@ -539,21 +583,40 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       Text(
-                        _timedOut
-                            ? "This is taking longer than usual — we'll keep "
-                                  "working on it in the background."
+                        _failed
+                            ? 'The analysis failed for this floor plan. Try '
+                                  'uploading a clearer image.'
+                            : _timedOut
+                            ? 'No analysis has arrived yet. Floor plans are '
+                                  'analysed by the web app, so open this one '
+                                  'there, then check again.'
                             : 'Our AI is analyzing every detail',
                         textAlign: TextAlign.center,
                         style: text.bodySmall?.copyWith(color: c.textMuted),
                       ),
                       const SizedBox(height: AppSpacing.xl),
                       if (_timedOut)
-                        AppButton(
-                          label: 'Back to dashboard',
-                          expanded: false,
-                          onPressed: () => Navigator.of(
-                            context,
-                          ).popUntil((route) => route.isFirst),
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: AppSpacing.md,
+                          runSpacing: AppSpacing.md,
+                          children: [
+                            if (!_failed)
+                              AppButton(
+                                label: 'Check again',
+                                icon: Icons.refresh_rounded,
+                                expanded: false,
+                                onPressed: _checkAgain,
+                              ),
+                            AppButton(
+                              label: 'Back to dashboard',
+                              expanded: false,
+                              variant: AppButtonVariant.secondary,
+                              onPressed: () => Navigator.of(
+                                context,
+                              ).popUntil((route) => route.isFirst),
+                            ),
+                          ],
                         )
                       else
                         SizedBox(
