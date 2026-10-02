@@ -45,9 +45,18 @@ class _DetectedRoom {
     required this.bounds,
     required this.suitability,
     required this.note,
+    this.fromAnalysis = false,
+    this.layoutsSupported = true,
   });
 
-  /// The real `Room.RoomID` this card represents.
+  /// True when this room came from the web pipeline's `DetectionJSON` (its id
+  /// is a detector id like `room-2`, not a `Room` table key).
+  final bool fromAnalysis;
+
+  /// The web layout engine only produces layouts for living rooms.
+  final bool layoutsSupported;
+
+  /// The room id: a `Room.RoomID`, or a detector id when [fromAnalysis].
   final String roomId;
   final String name;
   final IconData icon;
@@ -104,14 +113,63 @@ Rect _boundsForIndex(int index, int total) {
   return Rect.fromLTWH(col * (w + gap), row * (h + gap), w, h);
 }
 
+/// "4.2m × 3.1m · 13.0 m²", marking sizes the detector only estimated.
+String _analysisRoomNote(AnalysisRoom room) {
+  final w = room.widthM;
+  final h = room.heightM;
+  final area = room.areaM2;
+  if (w == null || h == null || area == null) {
+    return 'Size unknown — the plan has no printed scale';
+  }
+  return '${w.toStringAsFixed(1)}m × ${h.toStringAsFixed(1)}m · '
+      '${area.toStringAsFixed(1)} m² (estimated)';
+}
+
 Future<List<_DetectedRoom>> _loadDetectedRooms(
   FloorPlanRecord floorPlan,
   AppColors c,
 ) async {
+  final accents = _RoomAccent.values;
+
+  // The web pipeline keeps detection results as JSON on the analysis row.
+  final analysis = await FloorPlanRepository.instance.fetchAnalysis(
+    floorPlan.floorPlanId,
+  );
+  final analysisRooms = analysis?.rooms ?? const <AnalysisRoom>[];
+  if (analysisRooms.isNotEmpty) {
+    final layoutSet = AnalysisLayoutSet.from(analysis?.layoutJson);
+    return [
+      for (final (i, room) in analysisRooms.indexed)
+        _DetectedRoom(
+          roomId: room.id,
+          name: room.name,
+          icon: _iconForRoomType(room.name),
+          accent: accents[i % accents.length],
+          bounds: room.bboxFraction ?? _boundsForIndex(i, analysisRooms.length),
+          suitability:
+              layoutSet != null &&
+                  layoutSet.roomId == room.id &&
+                  layoutSet.layouts.isNotEmpty
+              ? layoutSet.layouts
+                    .firstWhere(
+                      (l) => l.type == layoutSet.bestType,
+                      orElse: () => layoutSet.layouts.first,
+                    )
+                    .suitability
+                    .round()
+                    .clamp(0, 100)
+              : 0,
+          note: _analysisRoomNote(room),
+          fromAnalysis: true,
+          layoutsSupported: room.isLivingRoom,
+        ),
+    ];
+  }
+
+  // Older relational pipeline: rows in the `Room` / `Layout` tables.
   final rooms = await FloorPlanRepository.instance.fetchRooms(
     floorPlan.floorPlanId,
   );
-  final accents = _RoomAccent.values;
   final result = <_DetectedRoom>[];
   for (final (i, room) in rooms.indexed) {
     final layouts = await FloorPlanRepository.instance.fetchLayouts(
@@ -141,6 +199,7 @@ Future<List<_DetectedRoom>> _loadDetectedRooms(
 class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   int _selected = 0;
   List<_DetectedRoom>? _rooms;
+  bool _loadFailed = false;
 
   @override
   void didChangeDependencies() {
@@ -149,9 +208,16 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   }
 
   Future<void> _load() async {
-    final rooms = await _loadDetectedRooms(widget.floorPlan, context.colors);
-    if (!mounted) return;
-    setState(() => _rooms = rooms);
+    final colors = context.colors;
+    setState(() => _loadFailed = false);
+    try {
+      final rooms = await _loadDetectedRooms(widget.floorPlan, colors);
+      if (!mounted) return;
+      setState(() => _rooms = rooms);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadFailed = true);
+    }
   }
 
   @override
@@ -162,7 +228,12 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     final rooms = _rooms;
 
     Widget body;
-    if (rooms == null) {
+    if (_loadFailed && rooms == null) {
+      body = _LoadError(
+        onRetry: _load,
+        message: 'We could not load the detected rooms. Retry, or go back.',
+      );
+    } else if (rooms == null) {
       body = const Padding(
         padding: EdgeInsets.symmetric(vertical: AppSpacing.huge),
         child: Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
@@ -279,12 +350,36 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   }
 
   void _openLayouts(BuildContext context, _DetectedRoom room) {
-    FloorPlanRepository.instance.selectRoomForAnalysis(
-      floorPlanId: widget.floorPlan.floorPlanId,
-      roomId: room.roomId,
-    );
+    if (!room.layoutsSupported) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Layouts are currently available for living rooms only. '
+            'Pick the living room to continue.',
+          ),
+        ),
+      );
+      return;
+    }
+    // Analysis rooms are recorded when a layout is confirmed; the legacy
+    // pipeline tracks the room as soon as it is chosen.
+    if (!room.fromAnalysis) {
+      unawaited(() async {
+        try {
+          await FloorPlanRepository.instance.selectRoomForAnalysis(
+            floorPlanId: widget.floorPlan.floorPlanId,
+            roomId: room.roomId,
+          );
+        } catch (_) {}
+      }());
+    }
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => LayoutsScreen(room: room)),
+      MaterialPageRoute<void>(
+        builder: (_) => LayoutsScreen(
+          room: room,
+          floorPlanId: widget.floorPlan.floorPlanId,
+        ),
+      ),
     );
   }
 }
@@ -318,7 +413,8 @@ class _FloorPlanDiagram extends StatelessWidget {
           );
           return GestureDetector(
             onTapUp: (details) {
-              final local = details.localPosition - const Offset(padding, padding);
+              final local =
+                  details.localPosition - const Offset(padding, padding);
               for (var i = rooms.length - 1; i >= 0; i--) {
                 final rect = Rect.fromLTWH(
                   rooms[i].bounds.left * size.width,

@@ -1,4 +1,4 @@
-part of 'main.dart';
+﻿part of 'main.dart';
 
 /// The full list behind the dashboard's "Recent Projects" preview and the
 /// "Projects" tab. Supports a simple name search; there's no backend yet, so
@@ -14,6 +14,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   final _searchController = TextEditingController();
   String _query = '';
   List<_ProjectView>? _projects;
+  bool _loadFailed = false;
 
   @override
   void didChangeDependencies() {
@@ -22,9 +23,16 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   }
 
   Future<void> _load() async {
-    final projects = await _loadUserProjects(context.colors);
-    if (!mounted) return;
-    setState(() => _projects = projects);
+    final colors = context.colors;
+    setState(() => _loadFailed = false);
+    try {
+      final projects = await _loadUserProjects(colors);
+      if (!mounted) return;
+      setState(() => _projects = projects);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadFailed = true);
+    }
   }
 
   @override
@@ -92,7 +100,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         ),
                 ),
                 const SizedBox(height: AppSpacing.xl),
-                if (results == null)
+                if (_loadFailed && results == null)
+                  _LoadError(onRetry: _load)
+                else if (results == null)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: AppSpacing.xxl),
                     child: Center(
@@ -101,9 +111,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                   )
                 else if (results.isEmpty)
                   _query.isEmpty
-                      ? _EmptyProjects(
-                          onUpload: () => _switchTab(context, 2),
-                        )
+                      ? _EmptyProjects(onUpload: () => _switchTab(context, 2))
                       : _NoResults(query: _query)
                 else
                   AppResponsiveGrid(
@@ -127,6 +135,46 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Generic "couldn't load" state with a retry action. Deliberately shows no
+/// backend error detail to the user (SRS FR31/FR32).
+class _LoadError extends StatelessWidget {
+  const _LoadError({required this.onRetry, this.message});
+
+  final VoidCallback onRetry;
+  final String? message;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.huge),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off_rounded, color: c.textMuted, size: 46),
+            const SizedBox(height: AppSpacing.lg),
+            Text('Something went wrong', style: context.text.titleSmall),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              message ?? 'We could not load this right now. Please try again.',
+              textAlign: TextAlign.center,
+              style: context.text.bodySmall?.copyWith(color: c.textMuted),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            AppButton(
+              label: 'Retry',
+              icon: Icons.refresh_rounded,
+              expanded: false,
+              onPressed: onRetry,
+            ),
+          ],
         ),
       ),
     );
