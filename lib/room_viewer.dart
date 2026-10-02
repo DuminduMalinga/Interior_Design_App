@@ -10,7 +10,11 @@ part of 'main.dart';
 // `_DetectedRoom`/`_LayoutOption` are private to this app's single-library
 // `part` setup, not leaked implementation details.
 class Room3DViewerScreen extends StatefulWidget {
-  const Room3DViewerScreen({required this.room, required this.layout, super.key});
+  const Room3DViewerScreen({
+    required this.room,
+    required this.layout,
+    super.key,
+  });
 
   final _DetectedRoom room;
   final _LayoutOption layout;
@@ -69,6 +73,7 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
                       yaw: _yaw,
                       zoom: _zoom,
                       placedFurniture: layout.furniture,
+                      analysis: layout.analysis,
                     ),
                     size: Size.infinite,
                   ),
@@ -219,10 +224,7 @@ class _GestureRail extends StatelessWidget {
         const SizedBox(height: AppSpacing.md),
         _GlassIconButton(icon: Icons.zoom_out_rounded, onTap: onZoomOut),
         const SizedBox(height: AppSpacing.xl),
-        _GlassIconButton(
-          icon: Icons.rotate_left_rounded,
-          onTap: onRotateLeft,
-        ),
+        _GlassIconButton(icon: Icons.rotate_left_rounded, onTap: onRotateLeft),
         const SizedBox(height: AppSpacing.md),
         _GlassIconButton(
           icon: Icons.rotate_right_rounded,
@@ -280,9 +282,9 @@ class _ViewerToolbar extends StatelessWidget {
   }
 
   void _notify(BuildContext context, String action) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$action coming soon.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('$action coming soon.')));
   }
 }
 
@@ -317,7 +319,10 @@ class _ToolbarAction extends StatelessWidget {
             children: [
               Icon(icon, size: 20, color: color),
               const SizedBox(height: AppSpacing.xs),
-              Text(label, style: context.text.labelSmall?.copyWith(color: color)),
+              Text(
+                label,
+                style: context.text.labelSmall?.copyWith(color: color),
+              ),
             ],
           ),
         ),
@@ -338,7 +343,12 @@ class _IsoRoomPainter extends CustomPainter {
     required this.yaw,
     required this.zoom,
     this.placedFurniture = const [],
+    this.analysis,
   });
+
+  /// A layout from the web pipeline. When set, the room takes its real
+  /// proportions and the furniture its real positions and heights.
+  final AnalysisLayout? analysis;
 
   final Color accent;
   final Color floor;
@@ -353,9 +363,36 @@ class _IsoRoomPainter extends CustomPainter {
   /// placements yet.
   final List<PlacedFurniture> placedFurniture;
 
-  static const _roomW = 200.0;
-  static const _roomD = 200.0;
   static const _roomH = 120.0;
+
+  double get _aspect {
+    final a = analysis;
+    return a != null && a.roomLength > 0 && a.roomWidth > 0
+        ? a.roomWidth / a.roomLength
+        : 1.0;
+  }
+
+  /// The longer side of the room always spans 200 painter units.
+  double get _roomW => _aspect >= 1 ? 200.0 : 200.0 * _aspect;
+  double get _roomD => _aspect >= 1 ? 200.0 / _aspect : 200.0;
+
+  /// Engine furniture (mm) mapped into painter units with a single uniform
+  /// scale so pieces keep their true proportions.
+  List<_FurnitureBox> _analysisFurnitureBoxes() {
+    final a = analysis;
+    if (a == null || a.roomWidth <= 0) return const [];
+    final k = _roomW / a.roomWidth;
+    return [
+      for (final f in a.furniture)
+        _FurnitureBox(
+          (f.x0 * k).clamp(0.0, _roomW),
+          (f.y0 * k).clamp(0.0, _roomD),
+          (f.x1 * k).clamp(0.0, _roomW),
+          (f.y1 * k).clamp(0.0, _roomD),
+          (f.height * k).clamp(6.0, 90.0),
+        ),
+    ];
+  }
 
   /// Maps real furniture placements (room-relative position/size in meters)
   /// onto the painter's 0-200 unit room space.
@@ -363,7 +400,8 @@ class _IsoRoomPainter extends CustomPainter {
     const metersToUnits = 40.0; // ~5m room maps across the 200-unit floor.
     return [
       for (final item in placedFurniture)
-        if (item.placement.positionX != null && item.placement.positionY != null)
+        if (item.placement.positionX != null &&
+            item.placement.positionY != null)
           _FurnitureBox(
             (item.placement.positionX! * metersToUnits).clamp(0, _roomW - 4),
             (item.placement.positionY! * metersToUnits).clamp(0, _roomD - 4),
@@ -433,7 +471,8 @@ class _IsoRoomPainter extends CustomPainter {
       _project(0, 0, _roomH, size),
     ], wallPaint);
 
-    final real = _realFurnitureBoxes();
+    final fromAnalysis = _analysisFurnitureBoxes();
+    final real = fromAnalysis.isNotEmpty ? fromAnalysis : _realFurnitureBoxes();
     final pieces = real.isNotEmpty
         ? real
         : _furniture[variant % _furniture.length];
@@ -514,7 +553,8 @@ class _IsoRoomPainter extends CustomPainter {
       oldDelegate.floor != floor ||
       oldDelegate.grid != grid ||
       oldDelegate.variant != variant ||
-      oldDelegate.placedFurniture != placedFurniture;
+      oldDelegate.placedFurniture != placedFurniture ||
+      oldDelegate.analysis != analysis;
 }
 
 class _FurnitureBox {

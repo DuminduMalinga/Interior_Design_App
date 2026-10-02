@@ -11,8 +11,18 @@ class ProfileScreen extends StatefulWidget {
 
 String _monthYear(DateTime dt) {
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return '${months[dt.month - 1]} ${dt.year}';
 }
@@ -129,7 +139,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _SettingsTile(
                 icon: Icons.admin_panel_settings_outlined,
                 title: 'Manage accounts',
-                subtitle: 'Review account deletion requests',
+                subtitle: 'View and delete accounts, review requests',
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => const AdminAccountsScreen(),
@@ -166,11 +176,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ? 'Account deletion requested'
                   : 'Delete my account',
               subtitle: _deletionRequest?.status == DeletionStatus.pending
-                  ? 'An admin will review your request'
+                  ? 'An admin will review it. Tap to cancel the request'
                   : 'Submit a request for an admin to review',
-              onTap: (profile == null ||
-                      _deletionRequest?.status == DeletionStatus.pending)
+              onTap: profile == null
                   ? null
+                  : _deletionRequest?.status == DeletionStatus.pending
+                  ? () => _cancelDeletionRequest(context, profile)
                   : () => _requestDeletion(context, profile),
             ),
           ],
@@ -285,9 +296,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _load();
     } catch (error) {
       if (!context.mounted) return;
+      final message = error is AuthException
+          ? error.message
+          : 'Could not submit the request. Please try again.';
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Could not submit request: $error')));
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  Future<void> _cancelDeletionRequest(
+    BuildContext context,
+    AppUserProfile profile,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancel deletion request?'),
+        content: const Text('Your account will stay as it is.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep request'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Cancel request'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await UserRepository.instance.cancelDeletionRequest(profile.userId);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Deletion request cancelled.')),
+      );
+      _load();
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not cancel the request.')),
+      );
     }
   }
 

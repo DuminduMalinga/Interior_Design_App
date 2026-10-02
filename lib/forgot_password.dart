@@ -48,7 +48,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             child: SizedBox.square(
               dimension: 64,
               child: Icon(
-                _sent ? Icons.mark_email_read_outlined : Icons.lock_reset_rounded,
+                _sent
+                    ? Icons.mark_email_read_outlined
+                    : Icons.lock_reset_rounded,
                 color: c.primary,
                 size: 28,
               ),
@@ -220,7 +222,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            "You're verified — set a new password to finish.",
+            "You're verified â€” set a new password to finish.",
             textAlign: TextAlign.center,
             style: text.bodySmall?.copyWith(color: c.textMuted),
           ),
@@ -237,14 +239,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               onPressed: () =>
                   setState(() => _obscurePassword = !_obscurePassword),
             ),
-            validator: (v) {
-              if (v == null || v.isEmpty) return 'Enter a new password';
-              if (v.length < 6) return 'At least 6 characters';
-              if (!RegExp(r'^(?=.*[A-Za-z])(?=.*\d).+$').hasMatch(v)) {
-                return 'Include a letter and a number';
-              }
-              return null;
-            },
+            validator: (v) =>
+                validateStrongPassword(v, emptyMessage: 'Enter a new password'),
           ),
           const SizedBox(height: AppSpacing.lg),
           AppInputField(
