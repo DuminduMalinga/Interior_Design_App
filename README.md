@@ -78,6 +78,23 @@ The web app ([Interior-Design-Web](https://github.com/DuminduMalinga/Interior-De
 | `Status` | both | `Detected` -> `LayoutReady` -> `LayoutSelected` |
 
 The mobile app reads these (`lib/data/models.dart`: `AnalysisRoom`, `AnalysisLayoutSet`) and saves a confirmed layout in the same shape, so a plan can be started on the web and finished on mobile, or the reverse. It does **not** run the wall detector or layout engine itself: a plan must be analysed by the web app first, and the engine currently handles living rooms only. The older `Room`/`Layout` tables are still read as a fallback.
+## Wall detector (`wall_detector/`)
+
+A Python service that produces the `DetectionJSON` document described above: a YOLO model (`best.pt`) finds rooms, walls, doors and windows, and EasyOCR reads each room's label and written size. Sizes are returned in metres, from `12'6" x 13'0"`, `3.5 x 4.0 m` or `mm` labels; plans that only print an area (`10.5 m²`) get sides derived from the room's shape; rooms with no printed size are estimated from the rooms that have one (or from an overall `40 ft` dimension line) and marked `dimensionsSource: "estimated"`.
+
+```bash
+cd wall_detector
+pip install -r requirements.txt
+# place the trained weights at wall_detector/best.pt (or set WALL_DETECTOR_WEIGHTS)
+python run.py plan.jpeg          # writes plan.detection.json
+uvicorn server:app --port 8001   # POST /analyze with a `file` upload
+python -m unittest test_labels
+
+# analyse plans uploaded from the app (service-role key from Supabase > Project Settings > API)
+set SUPABASE_SERVICE_KEY=...     # PowerShell: $env:SUPABASE_SERVICE_KEY="..."
+python worker.py
+```
+
 ## Getting started
 
 Requirements:
