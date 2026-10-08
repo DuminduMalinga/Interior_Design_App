@@ -46,3 +46,8 @@ app.*.map.json
 
 # Supabase CLI local link state
 supabase/.temp/
+
+# Wall detector model weights (52 MB) and generated output
+wall_detector/best.pt
+wall_detector/__pycache__/
+*.detection.json
