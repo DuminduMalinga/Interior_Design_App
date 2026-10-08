@@ -1,5 +1,19 @@
 part of 'main.dart';
 
+/// SRS FR4: at least 8 characters with an uppercase letter, a lowercase
+/// letter, a number and a special character.
+String? validateStrongPassword(String? v, {required String emptyMessage}) {
+  if (v == null || v.isEmpty) return emptyMessage;
+  if (v.length < 8) return 'At least 8 characters';
+  if (!RegExp(r'[A-Z]').hasMatch(v)) return 'Include an uppercase letter';
+  if (!RegExp(r'[a-z]').hasMatch(v)) return 'Include a lowercase letter';
+  if (!RegExp(r'\d').hasMatch(v)) return 'Include a number';
+  if (!RegExp(r'[^A-Za-z0-9]').hasMatch(v)) {
+    return 'Include a special character';
+  }
+  return null;
+}
+
 /// Combined sign up / sign in screen. A single form toggles between the two
 /// modes so the layout, validation, and social button stay in one place.
 class AuthScreen extends StatefulWidget {
@@ -99,14 +113,29 @@ class _AuthScreenState extends State<AuthScreen> {
           ],
           AppInputField(
             controller: _emailController,
-            hintText: 'Email address',
-            prefixIcon: Icons.mail_outline_rounded,
+            hintText: _isSignUp ? 'Email address' : 'Email or username',
+            prefixIcon: _isSignUp
+                ? Icons.mail_outline_rounded
+                : Icons.person_outline_rounded,
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.next,
             validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'Enter your email';
-              if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim())) {
-                return 'Enter a valid email';
+              final value = v?.trim() ?? '';
+              if (_isSignUp) {
+                if (value.isEmpty) return 'Enter your email';
+                if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value)) {
+                  return 'Enter a valid email';
+                }
+                return null;
+              }
+              // Sign in accepts either an email address or a username.
+              if (value.isEmpty) return 'Enter your email or username';
+              if (value.contains('@')) {
+                if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value)) {
+                  return 'Enter a valid email';
+                }
+              } else if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value)) {
+                return 'Usernames use letters, numbers and underscores';
               }
               return null;
             },
@@ -117,22 +146,19 @@ class _AuthScreenState extends State<AuthScreen> {
             hintText: 'Password',
             prefixIcon: Icons.lock_outline_rounded,
             obscureText: _obscurePassword,
-            textInputAction:
-                _isSignUp ? TextInputAction.next : TextInputAction.done,
+            textInputAction: _isSignUp
+                ? TextInputAction.next
+                : TextInputAction.done,
             suffixIcon: _VisibilityToggle(
               obscured: _obscurePassword,
               onPressed: () =>
                   setState(() => _obscurePassword = !_obscurePassword),
             ),
-            validator: (v) {
-              if (v == null || v.isEmpty) return 'Enter your password';
-              if (v.length < 6) return 'At least 6 characters';
-              if (_isSignUp &&
-                  !RegExp(r'^(?=.*[A-Za-z])(?=.*\d).+$').hasMatch(v)) {
-                return 'Include a letter and a number';
-              }
-              return null;
-            },
+            // Strength rules only apply when choosing a password; sign-in just
+            // needs a value so accounts created under older rules still work.
+            validator: (v) => _isSignUp
+                ? validateStrongPassword(v, emptyMessage: 'Enter your password')
+                : (v == null || v.isEmpty ? 'Enter your password' : null),
           ),
           if (_isSignUp) ...[
             const SizedBox(height: AppSpacing.lg),
@@ -166,7 +192,9 @@ class _AuthScreenState extends State<AuthScreen> {
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => ForgotPasswordScreen(
-                        initialEmail: _emailController.text.trim(),
+                        initialEmail: _emailController.text.contains('@')
+                            ? _emailController.text.trim()
+                            : '',
                       ),
                     ),
                   ),
@@ -275,16 +303,44 @@ class _AuthScreenState extends State<AuthScreen> {
           fullName: _fullNameController.text.trim(),
           username: _usernameController.text.trim(),
         );
+        // SRS: a new account is sent to Sign In rather than straight into
+        // the app. Supabase may have opened a session on sign-up, so close
+        // it to make the user sign in explicitly.
+        await AuthService.instance.signOut();
+        if (!mounted) return;
+        _passwordController.clear();
+        _confirmPasswordController.clear();
+        setState(() {
+          _isSignUp = false;
+          _submitting = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Account created successfully')),
+        );
+        return;
       } else {
         await AuthService.instance.signIn(
-          email: _emailController.text.trim(),
+          identifier: _emailController.text.trim(),
           password: _passwordController.text,
         );
       }
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
+      // SRS FR10: admins land on account management, customers on the
+      // dashboard. The dashboard stays underneath so admins can go back to it.
+      var isAdmin = false;
+      try {
+        isAdmin = await AuthService.instance.isAdmin();
+      } catch (_) {}
+      if (!mounted) return;
+      final navigator = Navigator.of(context);
+      navigator.pushReplacement(
         MaterialPageRoute<void>(builder: (_) => const DashboardScreen()),
       );
+      if (isAdmin) {
+        navigator.push(
+          MaterialPageRoute<void>(builder: (_) => const AdminAccountsScreen()),
+        );
+      }
     } catch (error) {
       if (!mounted) return;
       _showError(context, error);

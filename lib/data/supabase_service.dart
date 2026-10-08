@@ -69,8 +69,54 @@ class AuthService {
     }
   }
 
-  Future<void> signIn({required String email, required String password}) async {
-    await supa.auth.signInWithPassword(email: email, password: password);
+  /// SRS FR11: five consecutive failed sign-ins lock that email for 15
+  /// minutes. This only throttles the app on this device — a determined
+  /// attacker can call the Supabase API directly — so server-side
+  /// rate limiting in the Supabase dashboard is still the real control.
+  static const int maxFailedSignIns = 5;
+  static const Duration lockoutDuration = Duration(minutes: 15);
+  final Map<String, ({int failures, DateTime? lockedUntil})> _signInAttempts =
+      {};
+
+  /// Signs in with an email address or a username (SRS UC2). A username is
+  /// resolved server-side by the `username-login` edge function, so the app
+  /// never sees the account's email.
+  Future<void> signIn({
+    required String identifier,
+    required String password,
+  }) async {
+    final key = identifier.trim().toLowerCase();
+    final lockedUntil = _signInAttempts[key]?.lockedUntil;
+    if (lockedUntil != null && lockedUntil.isAfter(DateTime.now())) {
+      final minutes = lockedUntil.difference(DateTime.now()).inMinutes + 1;
+      throw AuthException(
+        'Too many failed attempts. Try again in $minutes minute'
+        '${minutes == 1 ? '' : 's'}.',
+      );
+    }
+
+    try {
+      if (identifier.contains('@')) {
+        await supa.auth.signInWithPassword(
+          email: identifier.trim(),
+          password: password,
+        );
+      } else {
+        await _signInWithUsername(identifier.trim(), password);
+      }
+    } on AuthRetryableFetchException {
+      rethrow; // Network trouble is not a wrong password.
+    } on AuthException {
+      final failures = (_signInAttempts[key]?.failures ?? 0) + 1;
+      final locked = failures >= maxFailedSignIns;
+      _signInAttempts[key] = (
+        failures: locked ? 0 : failures,
+        lockedUntil: locked ? DateTime.now().add(lockoutDuration) : null,
+      );
+      rethrow;
+    }
+    _signInAttempts.remove(key);
+
     final user = currentUser;
     if (user != null) {
       await supa
@@ -78,6 +124,31 @@ class AuthService {
           .update({'LastSignIn': DateTime.now().toUtc().toIso8601String()})
           .eq('UserID', user.id);
     }
+  }
+
+  Future<void> _signInWithUsername(String username, String password) async {
+    final FunctionResponse response;
+    try {
+      response = await supa.functions.invoke(
+        'username-login',
+        body: {'username': username, 'password': password},
+      );
+    } on FunctionException catch (e) {
+      final details = e.details;
+      final message = details is Map ? details['error']?.toString() : null;
+      // 4xx is a rejected login and counts toward the lockout; anything
+      // else is a server problem, which should not.
+      if (e.status >= 500) {
+        throw Exception(message ?? 'Sign in failed. Please try again.');
+      }
+      throw AuthException(message ?? 'Invalid login credentials');
+    }
+    final data = response.data;
+    final refreshToken = data is Map ? data['refresh_token'] as String? : null;
+    if (refreshToken == null) {
+      throw const AuthException('Invalid login credentials');
+    }
+    await supa.auth.setSession(refreshToken);
   }
 
   Future<void> signInWithGoogle() async {
@@ -160,13 +231,33 @@ class UserRepository {
 
   /// Submits an account-deletion request for an admin to review, matching
   /// the `DeletionRequest` table rather than deleting the account directly.
-  Future<void> requestAccountDeletion(AppUserProfile profile) {
-    return supa.from('DeletionRequest').insert({
+  Future<void> requestAccountDeletion(AppUserProfile profile) async {
+    // Same rule as the web app: one pending request per user.
+    final existing = await supa
+        .from('DeletionRequest')
+        .select('RequestID')
+        .eq('UserID', profile.userId)
+        .ilike('Status', 'pending')
+        .maybeSingle();
+    if (existing != null) {
+      throw const AuthException('You already have a pending deletion request.');
+    }
+    await supa.from('DeletionRequest').insert({
       'UserID': profile.userId,
       'Username': profile.userName,
       'Email': profile.email,
       'FullName': profile.fullName,
+      'Status': 'pending',
     });
+  }
+
+  /// Withdraws the user's own pending deletion request.
+  Future<void> cancelDeletionRequest(String userId) {
+    return supa
+        .from('DeletionRequest')
+        .delete()
+        .eq('UserID', userId)
+        .ilike('Status', 'pending');
   }
 
   Future<DeletionRequestRecord?> fetchOwnDeletionRequest(String userId) async {
@@ -334,42 +425,108 @@ class FloorPlanRepository {
   }
 }
 
+extension SelectedLayoutPersistence on FloorPlanRepository {
+  /// Persists the layout the customer confirmed (SRS UC8 "Save Layout") on
+  /// the floor plan's analysis row, so it survives leaving the screen and is
+  /// what the 3D view is generated from.
+  Future<void> saveSelectedLayout({
+    required String floorPlanId,
+    required String roomId,
+    required String layoutId,
+    required double score,
+  }) {
+    return supa
+        .from('FloorPlanAnalysis')
+        .update({
+          'SelectedRoomID': roomId,
+          'SelectedLayoutJSON': {
+            'layoutId': layoutId,
+            'roomId': roomId,
+            'score': score,
+            'selectedAt': DateTime.now().toUtc().toIso8601String(),
+          },
+          'UpdatedAt': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('FloorPlanID', floorPlanId);
+  }
+}
+
+extension AnalysisLayoutPersistence on FloorPlanRepository {
+  /// Saves a layout from the web pipeline's `LayoutJSON` in the same shape
+  /// the web app writes (`SelectedLayoutJSON` = the full layout document,
+  /// `Status` = `LayoutSelected`), so either client can reopen the choice.
+  Future<void> saveSelectedAnalysisLayout({
+    required String floorPlanId,
+    required String roomId,
+    required AnalysisLayout layout,
+  }) {
+    final userId = AuthService.instance.currentUser?.id;
+    if (userId == null) {
+      throw const AuthException('Your session expired. Please sign in again.');
+    }
+    return supa
+        .from('FloorPlanAnalysis')
+        .update({
+          'SelectedRoomID': roomId,
+          'SelectedLayoutJSON': layout.raw,
+          'Status': 'LayoutSelected',
+          'UpdatedAt': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('FloorPlanID', floorPlanId)
+        .eq('UserID', userId);
+  }
+}
+
 class AdminRepository {
   AdminRepository._();
   static final AdminRepository instance = AdminRepository._();
 
+  Future<List<AdminUserRecord>> fetchUsers() async {
+    final rows = await supa
+        .from('User')
+        .select('UserID, UserName, FullName, Email, LastSignIn, Role')
+        .order('FullName', ascending: true);
+    return rows.map(AdminUserRecord.fromJson).toList();
+  }
+
+  /// Pending requests only, like the web admin page. Matching is
+  /// case-insensitive because older rows were written as `Pending`.
   Future<List<DeletionRequestRecord>> fetchDeletionRequests() async {
     final rows = await supa
         .from('DeletionRequest')
         .select()
+        .ilike('Status', 'pending')
         .order('RequestedAt', ascending: false);
     return rows.map(DeletionRequestRecord.fromJson).toList();
   }
 
+  /// Rejecting removes the request, as the web app does.
   Future<void> rejectRequest(String requestId) {
-    return supa
-        .from('DeletionRequest')
-        .update({'Status': DeletionStatus.rejected.raw})
-        .eq('RequestID', requestId);
+    return supa.from('DeletionRequest').delete().eq('RequestID', requestId);
   }
 
-  /// Approves a deletion request: marks it approved and invokes the
-  /// `delete-user` edge function, which verifies the caller is an admin
-  /// server-side before removing the target auth user.
-  Future<void> approveRequest(DeletionRequestRecord request) async {
+  /// Permanently deletes an account (SRS UC3). Mirrors the web app's order:
+  /// the profile row and any requests go first, then the `delete-user` edge
+  /// function removes the auth user after verifying the caller is an admin.
+  Future<void> deleteAccount(String userId) async {
+    await supa.from('User').delete().eq('UserID', userId);
+    await supa.from('DeletionRequest').delete().eq('UserID', userId);
     final response = await supa.functions.invoke(
       'delete-user',
-      body: {'userId': request.userId},
+      body: {'userId': userId},
     );
     if (response.status != 200) {
       final error = (response.data is Map)
           ? (response.data as Map)['error']
           : null;
-      throw Exception(error?.toString() ?? 'Failed to delete the account.');
+      throw Exception(
+        'The profile was removed, but sign-in access could not be revoked'
+        '${error == null ? '.' : ': $error'}',
+      );
     }
-    await supa
-        .from('DeletionRequest')
-        .update({'Status': DeletionStatus.approved.raw})
-        .eq('RequestID', request.requestId);
   }
+
+  /// Approving a deletion request deletes the account.
+  Future<void> approveRequest(DeletionRequestRecord request) =>
+      deleteAccount(request.userId);
 }
