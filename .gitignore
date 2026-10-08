@@ -43,3 +43,14 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+<<<<<<< Updated upstream
+=======
+
+# Supabase CLI local link state
+supabase/.temp/
+
+# Wall detector model weights (52 MB) and generated output
+wall_detector/best.pt
+wall_detector/__pycache__/
+*.detection.json
+>>>>>>> Stashed changes
