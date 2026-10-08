@@ -86,7 +86,11 @@ class _TabScaffold extends StatelessWidget {
 /// the theme (the table has no color column) and, when the private storage
 /// object resolved, a short-lived signed URL to its image.
 class _ProjectView {
-  const _ProjectView({required this.record, required this.accent, this.imageUrl});
+  const _ProjectView({
+    required this.record,
+    required this.accent,
+    this.imageUrl,
+  });
 
   final FloorPlanRecord record;
   final Color accent;
@@ -111,8 +115,18 @@ String _formatRelativeDate(DateTime dateTime) {
   }
   if (diff.inDays < 7) return '${diff.inDays}d ago';
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return '${months[local.month - 1]} ${local.day}, ${local.year}';
 }
@@ -178,17 +192,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final user = AuthService.instance.currentUser;
     if (user == null) return;
     final c = context.colors;
-    final results = await Future.wait([
-      UserRepository.instance.fetchProfile(user.id),
-      AuthService.instance.isAdmin(),
-      _loadUserProjects(c),
-    ]);
+    final List<Object?> results;
+    try {
+      results = await Future.wait([
+        UserRepository.instance.fetchProfile(user.id),
+        AuthService.instance.isAdmin(),
+        _loadUserProjects(c),
+      ]);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _projects = const []);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Could not load your dashboard.'),
+          action: SnackBarAction(label: 'Retry', onPressed: _retryLoad),
+        ),
+      );
+      return;
+    }
     if (!mounted) return;
+    // The profile row is gone: an admin deleted this account while the
+    // session was still valid. The web app signs the user out in that case.
+    if (results[0] == null) {
+      await AuthService.instance.signOut();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          builder: (_) => const AuthScreen(startInSignIn: true),
+        ),
+        (route) => false,
+      );
+      return;
+    }
     setState(() {
       _profile = results[0] as AppUserProfile?;
       _isAdmin = results[1] as bool;
       _projects = results[2] as List<_ProjectView>;
     });
+  }
+
+  void _retryLoad() {
+    setState(() {
+      _profile = null;
+      _projects = null;
+    });
+    _load();
   }
 
   @override
