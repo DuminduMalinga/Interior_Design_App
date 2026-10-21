@@ -48,6 +48,7 @@ enum RoomKind {
     masterBedroom,
     kitchen,
     bathroom,
+    dining,
   };
 
   bool get isSupported => kindsSupported.contains(this);
@@ -87,6 +88,8 @@ class LayoutServiceEnv {
 
   static const String _bathroom = String.fromEnvironment('BATHROOM_LAYOUT_URL');
 
+  static const String _dining = String.fromEnvironment('DINING_LAYOUT_URL');
+
   static String get livingRoomUrl => _resolve(
     _livingRoom,
     path: 'living-room',
@@ -111,13 +114,16 @@ class LayoutServiceEnv {
     localDefault: 'http://10.0.2.2:8400',
   );
 
+  static String get diningUrl =>
+      _resolve(_dining, path: 'dining', localDefault: 'http://10.0.2.2:8500');
+
   static String urlFor(RoomKind kind) => switch (kind) {
     RoomKind.living => livingRoomUrl,
     RoomKind.bedroom => bedroomUrl,
     RoomKind.masterBedroom => masterBedroomUrl,
     RoomKind.kitchen => kitchenUrl,
     RoomKind.bathroom => bathroomUrl,
-    _ => throw UnsupportedError('No layout service wired for ${kind.name}.'),
+    RoomKind.dining => diningUrl,
   };
 
   static String _resolve(
@@ -196,6 +202,17 @@ class BathroomOptions {
   final bool accessible;
 
   Map<String, dynamic> toJson() => {'accessible': accessible};
+}
+
+/// Planning options for a dining area: the number of seats. Left null, the
+/// engine chooses from the floor area.
+class DiningOptions {
+  const DiningOptions({this.seats});
+
+  /// 2, 4, 6 or 8.
+  final int? seats;
+
+  Map<String, dynamic> toJson() => {if (seats != null) 'seats': seats};
 }
 
 /// The wall detector's output for one floor plan, as stored in
