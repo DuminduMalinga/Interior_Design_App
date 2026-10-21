@@ -144,6 +144,7 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
   LivingRoomOptions _livingOptions = const LivingRoomOptions();
   BedroomOptions _bedroomOptions = const BedroomOptions();
   KitchenOptions _kitchenOptions = const KitchenOptions();
+  BathroomOptions _bathroomOptions = const BathroomOptions();
   String? _selectedLayoutId;
 
   @override
@@ -214,6 +215,7 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
           RoomKind.bedroom ||
           RoomKind.masterBedroom => _bedroomOptions.toJson(),
           RoomKind.kitchen => _kitchenOptions.toJson(),
+          RoomKind.bathroom => _bathroomOptions.toJson(),
           _ => const {},
         },
       );
@@ -447,7 +449,8 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
     if (kind != RoomKind.living &&
         kind != RoomKind.bedroom &&
         kind != RoomKind.masterBedroom &&
-        kind != RoomKind.kitchen) {
+        kind != RoomKind.kitchen &&
+        kind != RoomKind.bathroom) {
       return const SizedBox.shrink();
     }
 
@@ -500,6 +503,22 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
             selected: _kitchenOptions.diningTable == choice,
             onSelected: (_) => regenerate(
               () => _kitchenOptions = KitchenOptions(diningTable: choice),
+            ),
+          ),
+      ]);
+    }
+
+    if (kind == RoomKind.bathroom) {
+      return group('Accessibility', [
+        for (final (label, accessible) in const <(String, bool)>[
+          ('None', false),
+          ('Wheelchair and grab bars', true),
+        ])
+          ChoiceChip(
+            label: Text(label),
+            selected: _bathroomOptions.accessible == accessible,
+            onSelected: (_) => regenerate(
+              () => _bathroomOptions = BathroomOptions(accessible: accessible),
             ),
           ),
       ]);
