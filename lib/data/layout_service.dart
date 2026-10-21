@@ -42,7 +42,7 @@ enum RoomKind {
   }
 
   /// Room kinds whose layout service the app can call.
-  static const Set<RoomKind> kindsSupported = {living};
+  static const Set<RoomKind> kindsSupported = {living, bedroom};
 
   bool get isSupported => kindsSupported.contains(this);
 
@@ -71,14 +71,20 @@ class LayoutServiceEnv {
     'LIVING_ROOM_LAYOUT_URL',
   );
 
+  static const String _bedroom = String.fromEnvironment('BEDROOM_LAYOUT_URL');
+
   static String get livingRoomUrl => _resolve(
     _livingRoom,
     path: 'living-room',
     localDefault: 'http://10.0.2.2:8100',
   );
 
+  static String get bedroomUrl =>
+      _resolve(_bedroom, path: 'bedroom', localDefault: 'http://10.0.2.2:8200');
+
   static String urlFor(RoomKind kind) => switch (kind) {
     RoomKind.living => livingRoomUrl,
+    RoomKind.bedroom => bedroomUrl,
     _ => throw UnsupportedError('No layout service wired for ${kind.name}.'),
   };
 
@@ -121,6 +127,19 @@ class LivingRoomOptions {
   Map<String, dynamic> toJson() => {
     if (activities != null) 'activities': [for (final a in activities!) a.name],
     'accessible': accessible,
+  };
+}
+
+/// Planning options for a bedroom: the head count (rule 11). Left null, the
+/// engine infers it from the floor area.
+class BedroomOptions {
+  const BedroomOptions({this.occupants});
+
+  /// 1 or 2.
+  final int? occupants;
+
+  Map<String, dynamic> toJson() => {
+    if (occupants != null) 'occupants': occupants,
   };
 }
 
