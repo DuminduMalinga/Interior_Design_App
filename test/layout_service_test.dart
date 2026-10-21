@@ -17,11 +17,15 @@ void main() {
       expect(RoomKind.fromName('Garage'), isNull);
     });
 
-    test('only the living room and bedroom are wired so far', () {
-      expect(RoomKind.living.isSupported, isTrue);
-      expect(RoomKind.bedroom.isSupported, isTrue);
-      expect(RoomKind.masterBedroom.isSupported, isFalse);
-    });
+    test(
+      'only the living room, bedroom and master bedroom are wired so far',
+      () {
+        expect(RoomKind.living.isSupported, isTrue);
+        expect(RoomKind.bedroom.isSupported, isTrue);
+        expect(RoomKind.masterBedroom.isSupported, isTrue);
+        expect(RoomKind.kitchen.isSupported, isFalse);
+      },
+    );
   });
 
   group('DetectionDocument.requestFor', () {
@@ -95,6 +99,7 @@ void main() {
       isNot(LayoutServiceEnv.urlFor(RoomKind.bedroom)),
     );
     expect(LayoutServiceEnv.urlFor(RoomKind.bedroom), endsWith(':8200'));
+    expect(LayoutServiceEnv.urlFor(RoomKind.masterBedroom), endsWith(':8600'));
   });
 
   test('LivingRoomOptions leaves activities out to let the engine decide', () {
