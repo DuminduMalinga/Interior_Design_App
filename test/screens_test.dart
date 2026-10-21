@@ -107,11 +107,7 @@ void main() {
       // signed-in session and seeded data to render anything beyond a
       // loading state, so they're covered by manual QA against the live
       // project rather than this static widget suite.
-      testWidgets(
-        'processing',
-        (tester) async {},
-        skip: true,
-      );
+      testWidgets('processing', (tester) async {}, skip: true);
 
       testWidgets(
         'room selection, layouts and 3D viewer',
@@ -119,23 +115,11 @@ void main() {
         skip: true,
       );
 
-      testWidgets(
-        'admin accounts',
-        (tester) async {},
-        skip: true,
-      );
+      testWidgets('admin accounts', (tester) async {}, skip: true);
 
-      testWidgets(
-        'profile',
-        (tester) async {},
-        skip: true,
-      );
+      testWidgets('profile', (tester) async {}, skip: true);
 
-      testWidgets(
-        'projects',
-        (tester) async {},
-        skip: true,
-      );
+      testWidgets('projects', (tester) async {}, skip: true);
     });
   }
 }

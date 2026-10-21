@@ -143,6 +143,7 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
   bool _generating = false;
   LivingRoomOptions _livingOptions = const LivingRoomOptions();
   BedroomOptions _bedroomOptions = const BedroomOptions();
+  KitchenOptions _kitchenOptions = const KitchenOptions();
   String? _selectedLayoutId;
 
   @override
@@ -212,6 +213,7 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
           RoomKind.living => _livingOptions.toJson(),
           RoomKind.bedroom ||
           RoomKind.masterBedroom => _bedroomOptions.toJson(),
+          RoomKind.kitchen => _kitchenOptions.toJson(),
           _ => const {},
         },
       );
@@ -444,7 +446,8 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
     final kind = widget.room.kind;
     if (kind != RoomKind.living &&
         kind != RoomKind.bedroom &&
-        kind != RoomKind.masterBedroom) {
+        kind != RoomKind.masterBedroom &&
+        kind != RoomKind.kitchen) {
       return const SizedBox.shrink();
     }
 
@@ -479,6 +482,24 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
             selected: _bedroomOptions.occupants == count,
             onSelected: (_) => regenerate(
               () => _bedroomOptions = BedroomOptions(occupants: count),
+            ),
+          ),
+      ]);
+    }
+
+    if (kind == RoomKind.kitchen) {
+      // Kitchen rule 10 concerns a dining table; Auto decides from the size.
+      return group('Dining table', [
+        for (final (label, choice) in const <(String, bool?)>[
+          ('Auto', null),
+          ('With', true),
+          ('Without', false),
+        ])
+          ChoiceChip(
+            label: Text(label),
+            selected: _kitchenOptions.diningTable == choice,
+            onSelected: (_) => regenerate(
+              () => _kitchenOptions = KitchenOptions(diningTable: choice),
             ),
           ),
       ]);

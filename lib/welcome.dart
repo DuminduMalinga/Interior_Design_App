@@ -243,8 +243,9 @@ class _Headline extends StatelessWidget {
     final align = centered ? TextAlign.center : TextAlign.start;
 
     return Column(
-      crossAxisAlignment:
-          centered ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      crossAxisAlignment: centered
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
         Text('Transform Floor Plans into', textAlign: align, style: style),
         ShaderMask(
