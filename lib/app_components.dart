@@ -239,7 +239,10 @@ class AppStatusChip extends StatelessWidget {
               Icon(icon, size: 13, color: color),
               const SizedBox(width: AppSpacing.xs + 1),
             ],
-            Text(label, style: context.text.labelMedium?.copyWith(color: color)),
+            Text(
+              label,
+              style: context.text.labelMedium?.copyWith(color: color),
+            ),
           ],
         ),
       ),
