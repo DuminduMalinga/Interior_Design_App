@@ -432,6 +432,11 @@ class _IsoRoomPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final a = analysis;
+    if (a != null && a.furniture.isNotEmpty && a.roomWidth > 0) {
+      _paintLayout(canvas, size, a);
+      return;
+    }
     final floorQuad = [
       _project(0, 0, 0, size),
       _project(_roomW, 0, 0, size),
@@ -490,6 +495,226 @@ class _IsoRoomPainter extends CustomPainter {
       _project(_roomW * .18, _roomD * .82, .3, size),
     ];
     _quad(canvas, rug, rugPaint);
+  }
+
+  // ── A layout from the engines: the real room, openings and furniture ──
+
+  void _paintLayout(Canvas canvas, Size size, AnalysisLayout a) {
+    final k = _roomW / a.roomWidth; // painter units per mm
+    final wallH = (a.roomHeight * k).clamp(60.0, 140.0);
+    final warm = Color.lerp(floor, _Finish.oak, .28)!;
+
+    // the floor, less the notch of an L-shaped room
+    var floorPath = Path()
+      ..addPolygon([
+        _project(0, 0, 0, size),
+        _project(_roomW, 0, 0, size),
+        _project(_roomW, _roomD, 0, size),
+        _project(0, _roomD, 0, size),
+      ], true);
+    for (final c in a.cutouts) {
+      floorPath = Path.combine(
+        PathOperation.difference,
+        floorPath,
+        Path()..addPolygon([
+          _project(c[0] * k, _roomD - c[3] * k, 0, size),
+          _project(c[2] * k, _roomD - c[3] * k, 0, size),
+          _project(c[2] * k, _roomD - c[1] * k, 0, size),
+          _project(c[0] * k, _roomD - c[1] * k, 0, size),
+        ], true),
+      );
+    }
+    canvas.drawPath(floorPath, Paint()..color = warm);
+    final plank = Paint()
+      ..color = grid
+      ..strokeWidth = 1;
+    final planks = (_roomD / 14).floor();
+    for (var i = 1; i < planks; i++) {
+      final y = i * 14.0;
+      canvas.drawLine(
+        _project(0, y, 0, size),
+        _project(_roomW, y, 0, size),
+        plank,
+      );
+    }
+
+    // the two far walls (north and west), with their doors and windows
+    final wall = Color.lerp(accent, Colors.white, .86)!.withValues(alpha: .55);
+    _wall(canvas, size, a, k, wallH, 'north', wall);
+    _wall(canvas, size, a, k, wallH, 'west', wall);
+    // the two near walls show only as a skirting line and their openings
+    _nearEdge(canvas, size, a, k, 'south');
+    _nearEdge(canvas, size, a, k, 'east');
+
+    final solids = _buildFurniture(a.furniture, k: k, roomD: _roomD);
+    final cosY = math.cos(yaw);
+    final sinY = math.sin(yaw);
+    double depth(_Solid s) =>
+        (s.cx * cosY - s.cy * sinY) + (s.cx * sinY + s.cy * cosY);
+    final flat = [
+      for (final s in solids)
+        if (s.flat) s,
+    ];
+    final upright =
+        [
+          for (final s in solids)
+            if (!s.flat) s,
+        ]..sort((x, y) {
+          final byDepth = depth(x).compareTo(depth(y));
+          return byDepth != 0 ? byDepth : x.z0.compareTo(y.z0);
+        });
+    for (final s in [...flat, ...upright]) {
+      _drawSolid(canvas, size, s);
+    }
+  }
+
+  /// Wall position (mm along the wall) to painter units.
+  double _along(String wall, double pos, double k) =>
+      wall == 'north' || wall == 'south'
+      ? pos * k
+      : _roomD - pos * k; // east/west positions run south to north
+
+  void _wall(
+    Canvas canvas,
+    Size size,
+    AnalysisLayout a,
+    double k,
+    double wallH,
+    String side,
+    Color color,
+  ) {
+    final north = side == 'north';
+    Offset at(double t, double z) =>
+        north ? _project(t, 0, z, size) : _project(0, t, z, size);
+    final length = north ? _roomW : _roomD;
+    _quad(canvas, [
+      at(0, 0),
+      at(length, 0),
+      at(length, wallH),
+      at(0, wallH),
+    ], Paint()..color = color);
+    canvas.drawLine(
+      at(0, 4),
+      at(length, 4),
+      Paint()
+        ..color = Colors.white.withValues(alpha: .5)
+        ..strokeWidth = 2,
+    );
+    for (final o in a.openings) {
+      if (o.wall != side || o.inset >= 1) continue;
+      final p0 = _along(side, o.position, k);
+      final p1 = _along(side, o.position + o.width, k);
+      final t0 = math.min(p0, p1);
+      final t1 = math.max(p0, p1);
+      final z0 = o.isDoor ? 0.0 : (o.sillHeight ?? 900) * k;
+      final z1 = o.isDoor ? 2100 * k : z0 + (o.height ?? 1200) * k;
+      _quad(
+        canvas,
+        [at(t0, z0), at(t1, z0), at(t1, z1), at(t0, z1)],
+        Paint()
+          ..color = o.isDoor
+              ? _Finish.walnut.withValues(alpha: .85)
+              : _Finish.glass.withValues(alpha: .75),
+      );
+      if (!o.isDoor) {
+        final line = Paint()
+          ..color = Colors.white.withValues(alpha: .9)
+          ..strokeWidth = 1.5;
+        final mid = (t0 + t1) / 2;
+        canvas.drawLine(at(mid, z0), at(mid, z1), line);
+        canvas.drawLine(at(t0, (z0 + z1) / 2), at(t1, (z0 + z1) / 2), line);
+      }
+    }
+  }
+
+  void _nearEdge(
+    Canvas canvas,
+    Size size,
+    AnalysisLayout a,
+    double k,
+    String side,
+  ) {
+    final south = side == 'south';
+    Offset at(double t) =>
+        south ? _project(t, _roomD, 0, size) : _project(_roomW, t, 0, size);
+    final length = south ? _roomW : _roomD;
+    canvas.drawLine(
+      at(0),
+      at(length),
+      Paint()
+        ..color = accent.withValues(alpha: .35)
+        ..strokeWidth = 2,
+    );
+    for (final o in a.openings) {
+      if (o.wall != side || o.inset >= 1) continue;
+      final p0 = _along(side, o.position, k);
+      final p1 = _along(side, o.position + o.width, k);
+      canvas.drawLine(
+        at(math.min(p0, p1)),
+        at(math.max(p0, p1)),
+        Paint()
+          ..color = o.isDoor ? _Finish.walnut : _Finish.glass
+          ..strokeWidth = 4,
+      );
+    }
+  }
+
+  void _drawSolid(Canvas canvas, Size size, _Solid s) {
+    final top = _tone(s.color, .12);
+    final yShade = _tone(s.color, -.1);
+    final xShade = _tone(s.color, -.26);
+    if (s.round) {
+      const n = 18;
+      final rx = (s.x1 - s.x0) / 2;
+      final ry = (s.y1 - s.y0) / 2;
+      Offset ring(int i, double z) {
+        final t = 2 * math.pi * i / n;
+        return _project(
+          s.cx + rx * math.cos(t),
+          s.cy + ry * math.sin(t),
+          z,
+          size,
+        );
+      }
+
+      for (var i = 0; i < n; i++) {
+        final mid = 2 * math.pi * (i + .5) / n;
+        final nx =
+            math.cos(mid) * math.cos(yaw) - math.sin(mid) * math.sin(yaw);
+        final ny =
+            math.cos(mid) * math.sin(yaw) + math.sin(mid) * math.cos(yaw);
+        final facing = nx + ny;
+        if (facing <= 0) continue;
+        _quad(
+          canvas,
+          [ring(i, s.z0), ring(i + 1, s.z0), ring(i + 1, s.z1), ring(i, s.z1)],
+          Paint()
+            ..color = Color.lerp(xShade, yShade, (facing / 1.41).clamp(0, 1))!,
+        );
+      }
+      _quad(canvas, [
+        for (var i = 0; i < n; i++) ring(i, s.z1),
+      ], Paint()..color = top);
+      return;
+    }
+    _quad(canvas, [
+      _project(s.x0, s.y0, s.z1, size),
+      _project(s.x1, s.y0, s.z1, size),
+      _project(s.x1, s.y1, s.z1, size),
+      _project(s.x0, s.y1, s.z1, size),
+    ], Paint()..color = top);
+    _quad(canvas, [
+      _project(s.x0, s.y1, s.z0, size),
+      _project(s.x1, s.y1, s.z0, size),
+      _project(s.x1, s.y1, s.z1, size),
+      _project(s.x0, s.y1, s.z1, size),
+    ], Paint()..color = yShade);
+    _quad(canvas, [
+      _project(s.x1, s.y0, s.z0, size),
+      _project(s.x1, s.y1, s.z0, size),
+      _project(s.x1, s.y1, s.z1, size),
+      _project(s.x1, s.y0, s.z1, size),
+    ], Paint()..color = xShade);
   }
 
   void _drawBox(Canvas canvas, Size size, _FurnitureBox p) {
