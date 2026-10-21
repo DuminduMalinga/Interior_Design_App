@@ -17,15 +17,13 @@ void main() {
       expect(RoomKind.fromName('Garage'), isNull);
     });
 
-    test(
-      'only the living room, bedroom and master bedroom are wired so far',
-      () {
-        expect(RoomKind.living.isSupported, isTrue);
-        expect(RoomKind.bedroom.isSupported, isTrue);
-        expect(RoomKind.masterBedroom.isSupported, isTrue);
-        expect(RoomKind.kitchen.isSupported, isFalse);
-      },
-    );
+    test('only the living room, bedrooms and kitchen are wired so far', () {
+      expect(RoomKind.living.isSupported, isTrue);
+      expect(RoomKind.bedroom.isSupported, isTrue);
+      expect(RoomKind.masterBedroom.isSupported, isTrue);
+      expect(RoomKind.kitchen.isSupported, isTrue);
+      expect(RoomKind.bathroom.isSupported, isFalse);
+    });
   });
 
   group('DetectionDocument.requestFor', () {
@@ -93,6 +91,16 @@ void main() {
     expect(const BedroomOptions(occupants: 2).toJson(), {'occupants': 2});
   });
 
+  test(
+    'KitchenOptions leaves the dining table out to let the engine decide',
+    () {
+      expect(const KitchenOptions().toJson(), isEmpty);
+      expect(const KitchenOptions(diningTable: false).toJson(), {
+        'dining_table': false,
+      });
+    },
+  );
+
   test('each wired room has its own service address', () {
     expect(
       LayoutServiceEnv.urlFor(RoomKind.living),
@@ -100,6 +108,7 @@ void main() {
     );
     expect(LayoutServiceEnv.urlFor(RoomKind.bedroom), endsWith(':8200'));
     expect(LayoutServiceEnv.urlFor(RoomKind.masterBedroom), endsWith(':8600'));
+    expect(LayoutServiceEnv.urlFor(RoomKind.kitchen), endsWith(':8300'));
   });
 
   test('LivingRoomOptions leaves activities out to let the engine decide', () {
