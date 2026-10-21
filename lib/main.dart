@@ -26,6 +26,8 @@ part 'forgot_password.dart';
 part 'welcome.dart';
 part 'profile.dart';
 part 'room_viewer.dart';
+part 'room_pieces.dart';
+part 'room_pieces_living.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
