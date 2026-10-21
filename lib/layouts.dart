@@ -210,7 +210,8 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
         request: request,
         options: switch (kind) {
           RoomKind.living => _livingOptions.toJson(),
-          RoomKind.bedroom => _bedroomOptions.toJson(),
+          RoomKind.bedroom ||
+          RoomKind.masterBedroom => _bedroomOptions.toJson(),
           _ => const {},
         },
       );
@@ -441,7 +442,9 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
     final c = context.colors;
     final text = context.text;
     final kind = widget.room.kind;
-    if (kind != RoomKind.living && kind != RoomKind.bedroom) {
+    if (kind != RoomKind.living &&
+        kind != RoomKind.bedroom &&
+        kind != RoomKind.masterBedroom) {
       return const SizedBox.shrink();
     }
 
@@ -467,8 +470,8 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
       _generate();
     }
 
-    if (kind == RoomKind.bedroom) {
-      // Bedroom rule 11 needs a head count; Auto lets the engine decide.
+    if (kind == RoomKind.bedroom || kind == RoomKind.masterBedroom) {
+      // The bedroom engines take a head count; Auto lets the engine decide.
       return group('Persons', [
         for (final count in const <int?>[null, 1, 2])
           ChoiceChip(
