@@ -42,7 +42,7 @@ enum RoomKind {
   }
 
   /// Room kinds whose layout service the app can call.
-  static const Set<RoomKind> kindsSupported = {living, bedroom};
+  static const Set<RoomKind> kindsSupported = {living, bedroom, masterBedroom};
 
   bool get isSupported => kindsSupported.contains(this);
 
@@ -73,6 +73,10 @@ class LayoutServiceEnv {
 
   static const String _bedroom = String.fromEnvironment('BEDROOM_LAYOUT_URL');
 
+  static const String _masterBedroom = String.fromEnvironment(
+    'MASTER_BEDROOM_LAYOUT_URL',
+  );
+
   static String get livingRoomUrl => _resolve(
     _livingRoom,
     path: 'living-room',
@@ -82,9 +86,16 @@ class LayoutServiceEnv {
   static String get bedroomUrl =>
       _resolve(_bedroom, path: 'bedroom', localDefault: 'http://10.0.2.2:8200');
 
+  static String get masterBedroomUrl => _resolve(
+    _masterBedroom,
+    path: 'master-bedroom',
+    localDefault: 'http://10.0.2.2:8600',
+  );
+
   static String urlFor(RoomKind kind) => switch (kind) {
     RoomKind.living => livingRoomUrl,
     RoomKind.bedroom => bedroomUrl,
+    RoomKind.masterBedroom => masterBedroomUrl,
     _ => throw UnsupportedError('No layout service wired for ${kind.name}.'),
   };
 
@@ -130,8 +141,9 @@ class LivingRoomOptions {
   };
 }
 
-/// Planning options for a bedroom: the head count (rule 11). Left null, the
-/// engine infers it from the floor area.
+/// Planning options for a bedroom or master bedroom: the head count. Left
+/// null, the engine infers it (a bedroom from the floor area, a master
+/// bedroom two).
 class BedroomOptions {
   const BedroomOptions({this.occupants});
 
