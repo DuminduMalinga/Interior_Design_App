@@ -53,7 +53,7 @@ class _DetectedRoom {
   /// is a detector id like `room-2`, not a `Room` table key).
   final bool fromAnalysis;
 
-  /// The web layout engine only produces layouts for living rooms.
+  /// Whether a layout engine is wired up for this kind of room yet.
   final bool layoutsSupported;
 
   /// The room id: a `Room.RoomID`, or a detector id when [fromAnalysis].
@@ -73,6 +73,9 @@ class _DetectedRoom {
   final String note;
 
   Color colorIn(AppColors c) => accent.resolve(c);
+
+  /// Which layout engine this room gets, from its name.
+  RoomKind? get kind => RoomKind.fromName(name);
 
   String get tag {
     if (suitability >= 90) return 'Excellent fit';
@@ -161,7 +164,7 @@ Future<List<_DetectedRoom>> _loadDetectedRooms(
               : 0,
           note: _analysisRoomNote(room),
           fromAnalysis: true,
-          layoutsSupported: room.isLivingRoom,
+          layoutsSupported: RoomKind.fromName(room.name)?.isSupported ?? false,
         ),
     ];
   }
@@ -354,7 +357,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Layouts are currently available for living rooms only. '
+            'Layouts are not available for this room yet. '
             'Pick the living room to continue.',
           ),
         ),
