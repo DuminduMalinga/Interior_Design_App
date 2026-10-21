@@ -479,6 +479,11 @@ class AnalysisFurniture {
     required this.x1,
     required this.y1,
     required this.height,
+    this.facing = 'south',
+    this.mounted,
+    this.mountHeight,
+    this.shape,
+    this.parts = const [],
   });
 
   /// `bbox` is `[x0, y0, x1, y1]` in mm.
@@ -504,6 +509,16 @@ class AnalysisFurniture {
       x1: x1,
       y1: y1,
       height: _asDouble(json['height']) ?? 700,
+      facing: json['facing'] as String? ?? 'south',
+      mounted: json['mounted'] as String?,
+      mountHeight: _asDouble(json['mount_height']),
+      shape: json['shape'] as String?,
+      parts: [
+        if (json['parts'] is List)
+          for (final part in json['parts'] as List)
+            if (part is List && part.length == 4)
+              [for (final v in part) _asDouble(v) ?? 0],
+      ],
     );
   }
 
@@ -514,6 +529,19 @@ class AnalysisFurniture {
   final double x1;
   final double y1;
   final double height;
+
+  /// The compass side the piece faces: north | south | east | west.
+  final String facing;
+
+  /// floor | wall | drain | ceiling | table; null means the floor.
+  final String? mounted;
+
+  /// Height of a wall fitting's or light's fixing above the floor, mm.
+  final double? mountHeight;
+
+  /// `l` for a corner piece, whose footprint is [parts] (each `[x0, y0, x1, y1]`, mm).
+  final String? shape;
+  final List<List<double>> parts;
 
   String get label => type
       .split('_')
@@ -527,12 +555,22 @@ class AnalysisOpening {
     required this.position,
     required this.width,
     required this.isDoor,
+    this.height,
+    this.sillHeight,
+    this.inset = 0,
   });
 
   final String wall; // north | south | east | west
   final double position;
   final double width;
   final bool isDoor;
+
+  /// Window height and sill height above the floor, mm.
+  final double? height;
+  final double? sillHeight;
+
+  /// mm the opening stands in from its wall's line (a wall round a notch).
+  final double inset;
 }
 
 /// One furnished layout from `LayoutJSON.layouts` (or `SelectedLayoutJSON`).
@@ -547,6 +585,7 @@ class AnalysisLayout {
     required this.roomHeight,
     required this.furniture,
     required this.openings,
+    this.cutouts = const [],
     required this.reasons,
     required this.components,
     required this.valid,
@@ -579,6 +618,9 @@ class AnalysisLayout {
               position: _asDouble(o['position']) ?? 0,
               width: _asDouble(o['width']) ?? 0,
               isDoor: isDoor,
+              height: _asDouble(o['height']),
+              sillHeight: _asDouble(o['sill_height']),
+              inset: _asDouble(o['inset']) ?? 0,
             ),
     ];
     List<String> strings(Object? v) => [
@@ -600,6 +642,12 @@ class AnalysisLayout {
           for (final f in json['furniture'] as List)
             if (f is Map)
               AnalysisFurniture.fromJson(Map<String, dynamic>.from(f)),
+      ],
+      cutouts: [
+        if (room['cutouts'] is List)
+          for (final c in room['cutouts'] as List)
+            if (c is List && c.length == 4)
+              [for (final v in c) _asDouble(v) ?? 0],
       ],
       openings: [
         ...openings(openingsJson['doors'], true),
@@ -630,6 +678,10 @@ class AnalysisLayout {
   final double roomHeight;
   final List<AnalysisFurniture> furniture;
   final List<AnalysisOpening> openings;
+
+  /// Parts of the width x length rectangle that are not floor (an L-shaped
+  /// room's notch), each `[x0, y0, x1, y1]` in mm.
+  final List<List<double>> cutouts;
   final List<String> reasons;
   final Map<String, double> components;
   final bool valid;
