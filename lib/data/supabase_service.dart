@@ -477,6 +477,33 @@ extension AnalysisLayoutPersistence on FloorPlanRepository {
   }
 }
 
+extension GeneratedLayoutPersistence on FloorPlanRepository {
+  /// Saves the layouts the app generated for [roomId] as the analysis row's
+  /// `LayoutJSON`, in the shape the web app writes. Any earlier confirmed
+  /// layout is cleared, since it belonged to a previous generation.
+  Future<void> saveGeneratedLayouts({
+    required String floorPlanId,
+    required String roomId,
+    required Map<String, dynamic> layouts,
+  }) {
+    final userId = AuthService.instance.currentUser?.id;
+    if (userId == null) {
+      throw const AuthException('Your session expired. Please sign in again.');
+    }
+    return supa
+        .from('FloorPlanAnalysis')
+        .update({
+          'SelectedRoomID': roomId,
+          'LayoutJSON': {...layouts, 'roomId': roomId},
+          'SelectedLayoutJSON': null,
+          'Status': 'LayoutReady',
+          'UpdatedAt': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('FloorPlanID', floorPlanId)
+        .eq('UserID', userId);
+  }
+}
+
 class AdminRepository {
   AdminRepository._();
   static final AdminRepository instance = AdminRepository._();
