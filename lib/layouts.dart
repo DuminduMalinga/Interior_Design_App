@@ -142,6 +142,7 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
   String _errorMessage = 'We could not load the layouts for this room.';
   bool _generating = false;
   LivingRoomOptions _livingOptions = const LivingRoomOptions();
+  BedroomOptions _bedroomOptions = const BedroomOptions();
   String? _selectedLayoutId;
 
   @override
@@ -209,6 +210,7 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
         request: request,
         options: switch (kind) {
           RoomKind.living => _livingOptions.toJson(),
+          RoomKind.bedroom => _bedroomOptions.toJson(),
           _ => const {},
         },
       );
@@ -439,7 +441,9 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
     final c = context.colors;
     final text = context.text;
     final kind = widget.room.kind;
-    if (kind != RoomKind.living) return const SizedBox.shrink();
+    if (kind != RoomKind.living && kind != RoomKind.bedroom) {
+      return const SizedBox.shrink();
+    }
 
     Widget group(String label, List<Widget> chips) => Padding(
       padding: const EdgeInsets.only(top: AppSpacing.md),
@@ -457,11 +461,28 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
       ),
     );
 
-    void pick(LivingRoomOptions next) {
+    void regenerate(VoidCallback apply) {
       if (_generating) return;
-      setState(() => _livingOptions = next);
+      setState(apply);
       _generate();
     }
+
+    if (kind == RoomKind.bedroom) {
+      // Bedroom rule 11 needs a head count; Auto lets the engine decide.
+      return group('Persons', [
+        for (final count in const <int?>[null, 1, 2])
+          ChoiceChip(
+            label: Text(count == null ? 'Auto' : '$count'),
+            selected: _bedroomOptions.occupants == count,
+            onSelected: (_) => regenerate(
+              () => _bedroomOptions = BedroomOptions(occupants: count),
+            ),
+          ),
+      ]);
+    }
+
+    void pick(LivingRoomOptions next) =>
+        regenerate(() => _livingOptions = next);
 
     String key(List<LivingActivity>? a) =>
         a?.map((e) => e.name).join(',') ?? '';
