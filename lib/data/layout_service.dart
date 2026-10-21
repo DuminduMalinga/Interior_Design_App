@@ -42,7 +42,12 @@ enum RoomKind {
   }
 
   /// Room kinds whose layout service the app can call.
-  static const Set<RoomKind> kindsSupported = {living, bedroom, masterBedroom};
+  static const Set<RoomKind> kindsSupported = {
+    living,
+    bedroom,
+    masterBedroom,
+    kitchen,
+  };
 
   bool get isSupported => kindsSupported.contains(this);
 
@@ -77,6 +82,8 @@ class LayoutServiceEnv {
     'MASTER_BEDROOM_LAYOUT_URL',
   );
 
+  static const String _kitchen = String.fromEnvironment('KITCHEN_LAYOUT_URL');
+
   static String get livingRoomUrl => _resolve(
     _livingRoom,
     path: 'living-room',
@@ -92,10 +99,14 @@ class LayoutServiceEnv {
     localDefault: 'http://10.0.2.2:8600',
   );
 
+  static String get kitchenUrl =>
+      _resolve(_kitchen, path: 'kitchen', localDefault: 'http://10.0.2.2:8300');
+
   static String urlFor(RoomKind kind) => switch (kind) {
     RoomKind.living => livingRoomUrl,
     RoomKind.bedroom => bedroomUrl,
     RoomKind.masterBedroom => masterBedroomUrl,
+    RoomKind.kitchen => kitchenUrl,
     _ => throw UnsupportedError('No layout service wired for ${kind.name}.'),
   };
 
@@ -152,6 +163,18 @@ class BedroomOptions {
 
   Map<String, dynamic> toJson() => {
     if (occupants != null) 'occupants': occupants,
+  };
+}
+
+/// Planning options for a kitchen: whether to try a dining table. Left null,
+/// the engine decides from the floor area.
+class KitchenOptions {
+  const KitchenOptions({this.diningTable});
+
+  final bool? diningTable;
+
+  Map<String, dynamic> toJson() => {
+    if (diningTable != null) 'dining_table': diningTable,
   };
 }
 
