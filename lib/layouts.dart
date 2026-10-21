@@ -145,6 +145,7 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
   BedroomOptions _bedroomOptions = const BedroomOptions();
   KitchenOptions _kitchenOptions = const KitchenOptions();
   BathroomOptions _bathroomOptions = const BathroomOptions();
+  DiningOptions _diningOptions = const DiningOptions();
   String? _selectedLayoutId;
 
   @override
@@ -216,7 +217,7 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
           RoomKind.masterBedroom => _bedroomOptions.toJson(),
           RoomKind.kitchen => _kitchenOptions.toJson(),
           RoomKind.bathroom => _bathroomOptions.toJson(),
-          _ => const {},
+          RoomKind.dining => _diningOptions.toJson(),
         },
       );
       await FloorPlanRepository.instance.saveGeneratedLayouts(
@@ -450,7 +451,8 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
         kind != RoomKind.bedroom &&
         kind != RoomKind.masterBedroom &&
         kind != RoomKind.kitchen &&
-        kind != RoomKind.bathroom) {
+        kind != RoomKind.bathroom &&
+        kind != RoomKind.dining) {
       return const SizedBox.shrink();
     }
 
@@ -520,6 +522,18 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
             onSelected: (_) => regenerate(
               () => _bathroomOptions = BathroomOptions(accessible: accessible),
             ),
+          ),
+      ]);
+    }
+
+    if (kind == RoomKind.dining) {
+      return group('Seats', [
+        for (final count in const <int?>[null, 2, 4, 6, 8])
+          ChoiceChip(
+            label: Text(count == null ? 'Auto' : '$count'),
+            selected: _diningOptions.seats == count,
+            onSelected: (_) =>
+                regenerate(() => _diningOptions = DiningOptions(seats: count)),
           ),
       ]);
     }
