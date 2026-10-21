@@ -34,6 +34,25 @@ const _layoutArchetypes = [
   ('Compact Efficient', ['Space-saving', 'Multi-use']),
 ];
 
+/// Activity presets offered for a living room (matches the web app's).
+const _livingActivitySets = <(String, List<LivingActivity>?)>[
+  ('Auto', null),
+  ('Talk & TV', [LivingActivity.conversation, LivingActivity.tv]),
+  (
+    '+ Dining',
+    [LivingActivity.conversation, LivingActivity.tv, LivingActivity.dining],
+  ),
+  (
+    '+ Reading',
+    [LivingActivity.conversation, LivingActivity.tv, LivingActivity.reading],
+  ),
+  (
+    '+ Work',
+    [LivingActivity.conversation, LivingActivity.tv, LivingActivity.work],
+  ),
+  ('Talk only', [LivingActivity.conversation]),
+];
+
 class _LayoutOption {
   const _LayoutOption({
     required this.layoutId,
@@ -120,6 +139,9 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
   int _page = 0;
   List<_LayoutOption>? _layouts;
   bool _loadFailed = false;
+  String _errorMessage = 'We could not load the layouts for this room.';
+  bool _generating = false;
+  LivingRoomOptions _livingOptions = const LivingRoomOptions();
   String? _selectedLayoutId;
 
   @override
@@ -132,7 +154,13 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
   Future<void> _load() async {
     setState(() => _loadFailed = false);
     try {
-      final layouts = await _loadLayoutOptions(widget.room, widget.floorPlanId);
+      var layouts = await _loadLayoutOptions(widget.room, widget.floorPlanId);
+      // The web generates layouts when a room is opened; do the same here
+      // the first time, rather than asking the user to go to the web app.
+      if (layouts.isEmpty && _canGenerate) {
+        await _generate();
+        return;
+      }
       final saved = await _loadSavedSelection(layouts);
       if (!mounted) return;
       setState(() {
@@ -141,7 +169,75 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loadFailed = true);
+      setState(() {
+        _errorMessage = 'We could not load the layouts for this room.';
+        _loadFailed = true;
+      });
+    }
+  }
+
+  /// Rooms detected by the web pipeline whose kind has a layout service.
+  bool get _canGenerate =>
+      widget.room.fromAnalysis && (widget.room.kind?.isSupported ?? false);
+
+  /// Asks the room's layout service for fresh layouts, saves them against the
+  /// floor plan's analysis row, then shows them.
+  Future<void> _generate() async {
+    final kind = widget.room.kind;
+    if (kind == null) return;
+    setState(() {
+      _generating = true;
+      _loadFailed = false;
+      _layouts = null;
+      _selectedLayoutId = null;
+    });
+    try {
+      final analysis = await FloorPlanRepository.instance.fetchAnalysis(
+        widget.floorPlanId,
+      );
+      final request = DetectionDocument.from(
+        analysis?.detectionJson,
+      )?.requestFor(widget.room.roomId);
+      if (request == null) {
+        throw const LayoutServiceException(
+          'This floor plan has no detection data for the room. '
+          'Re-run the analysis from the web app.',
+        );
+      }
+      final layouts = await LayoutService.instance.generateAll(
+        kind: kind,
+        request: request,
+        options: switch (kind) {
+          RoomKind.living => _livingOptions.toJson(),
+          _ => const {},
+        },
+      );
+      await FloorPlanRepository.instance.saveGeneratedLayouts(
+        floorPlanId: widget.floorPlanId,
+        roomId: widget.room.roomId,
+        layouts: layouts,
+      );
+      final options = await _loadLayoutOptions(widget.room, widget.floorPlanId);
+      if (!mounted) return;
+      setState(() {
+        _layouts = options;
+        _page = 0;
+        if (_pageController.hasClients) _pageController.jumpToPage(0);
+      });
+    } on LayoutServiceException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.message;
+        _loadFailed = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Could not generate layouts. Try again.';
+        _loadFailed = true;
+      });
+    } finally {
+      if (mounted) setState(() => _generating = false);
     }
   }
 
@@ -311,6 +407,7 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
             ],
           ),
         ),
+        if (_canGenerate) _buildOptions(context),
       ],
     );
 
@@ -337,6 +434,74 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
     );
   }
 
+  /// The room's planning options, as chips; changing one regenerates.
+  Widget _buildOptions(BuildContext context) {
+    final c = context.colors;
+    final text = context.text;
+    final kind = widget.room.kind;
+    if (kind != RoomKind.living) return const SizedBox.shrink();
+
+    Widget group(String label, List<Widget> chips) => Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: text.labelMedium?.copyWith(color: c.textMuted)),
+          const SizedBox(height: AppSpacing.xs),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
+            children: chips,
+          ),
+        ],
+      ),
+    );
+
+    void pick(LivingRoomOptions next) {
+      if (_generating) return;
+      setState(() => _livingOptions = next);
+      _generate();
+    }
+
+    String key(List<LivingActivity>? a) =>
+        a?.map((e) => e.name).join(',') ?? '';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        group('Daily activities', [
+          for (final (label, activities) in _livingActivitySets)
+            ChoiceChip(
+              label: Text(label),
+              selected: key(_livingOptions.activities) == key(activities),
+              onSelected: (_) => pick(
+                LivingRoomOptions(
+                  activities: activities,
+                  accessible: _livingOptions.accessible,
+                ),
+              ),
+            ),
+        ]),
+        group('Mobility needs', [
+          for (final (label, accessible) in const [
+            ('None', false),
+            ('Wider paths, no rug', true),
+          ])
+            ChoiceChip(
+              label: Text(label),
+              selected: _livingOptions.accessible == accessible,
+              onSelected: (_) => pick(
+                LivingRoomOptions(
+                  activities: _livingOptions.activities,
+                  accessible: accessible,
+                ),
+              ),
+            ),
+        ]),
+      ],
+    );
+  }
+
   Widget _buildLoading(Widget header) {
     return SingleChildScrollView(
       child: AppContentFrame(
@@ -346,6 +511,17 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
             header,
             const SizedBox(height: AppSpacing.huge),
             const Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
+            if (_generating) ...[
+              const SizedBox(height: AppSpacing.lg),
+              Center(
+                child: Text(
+                  'Generating layouts for the ${widget.room.name}…',
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.colors.textMuted,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -360,8 +536,8 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
           children: [
             header,
             _LoadError(
-              onRetry: _load,
-              message: 'We could not load the layouts for this room.',
+              onRetry: _canGenerate ? _generate : _load,
+              message: _errorMessage,
             ),
           ],
         ),
@@ -391,21 +567,27 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
                   Text('No AI layouts yet', style: context.text.titleSmall),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    widget.room.fromAnalysis
-                        ? 'Layouts for this room have not been generated yet. '
-                              'Generate them from the web app, then refresh.'
+                    _canGenerate
+                        ? 'The layout service did not return any layouts for '
+                              'this room. Change the options or try again.'
+                        : widget.room.fromAnalysis
+                        ? 'Layouts are not available for this kind of room yet.'
                         : 'Layouts for this room are still being generated.',
                     textAlign: TextAlign.center,
                     style: context.text.bodySmall?.copyWith(color: c.textMuted),
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   AppButton(
-                    label: 'Refresh',
+                    label: _canGenerate ? 'Generate again' : 'Refresh',
                     icon: Icons.refresh_rounded,
                     expanded: false,
                     onPressed: () {
-                      setState(() => _layouts = null);
-                      _load();
+                      if (_canGenerate) {
+                        _generate();
+                      } else {
+                        setState(() => _layouts = null);
+                        _load();
+                      }
                     },
                   ),
                 ],

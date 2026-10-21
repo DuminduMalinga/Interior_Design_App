@@ -466,7 +466,6 @@ class AnalysisRoom {
   /// Position within the plan image as fractions (0-1) of its size.
   final Rect? bboxFraction;
 
-  /// The web's layout engine only handles living rooms.
   bool get isLivingRoom =>
       RegExp('living', caseSensitive: false).hasMatch(name);
 }

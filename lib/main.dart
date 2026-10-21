@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_components.dart';
 import 'app_theme.dart';
+import 'data/layout_service.dart';
 import 'data/models.dart';
 import 'data/supabase_service.dart';
 import 'env.dart';
