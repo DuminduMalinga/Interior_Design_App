@@ -1,9 +1,8 @@
 part of 'main.dart';
 
 /// Admin panel (SRS UC3). Two tabs: every registered account, which an admin
-/// can search and delete after confirming, and the pending account-deletion
-/// requests users have submitted, which can be approved (deleting the
-/// account) or rejected.
+/// can search and delete after confirming (customers only: admin accounts are
+/// protected, as on the web), and the activity log of what admins did.
 class AdminAccountsScreen extends StatefulWidget {
   const AdminAccountsScreen({super.key});
 
@@ -14,9 +13,9 @@ class AdminAccountsScreen extends StatefulWidget {
 class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
   final _searchController = TextEditingController();
   String _query = '';
-  int _tab = 0; // 0 = accounts, 1 = deletion requests
+  int _tab = 0; // 0 = accounts, 1 = activity
   List<AdminUserRecord>? _users;
-  List<DeletionRequestRecord>? _requests;
+  List<AuditEntry>? _activity;
   bool _loadFailed = false;
   final Set<String> _busyIds = {};
 
@@ -30,11 +29,14 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
     setState(() => _loadFailed = false);
     try {
       final users = await AdminRepository.instance.fetchUsers();
-      final requests = await AdminRepository.instance.fetchDeletionRequests();
+      // the log is a nicety: the accounts still show if it cannot be read
+      final activity = await AdminRepository.instance
+          .fetchAuditLog()
+          .catchError((Object _) => <AuditEntry>[]);
       if (!mounted) return;
       setState(() {
         _users = users;
-        _requests = requests;
+        _activity = activity;
       });
     } catch (_) {
       if (!mounted) return;
@@ -59,11 +61,11 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
     ];
   }
 
-  List<DeletionRequestRecord> get _filteredRequests {
+  List<AuditEntry> get _filteredActivity {
     final q = _query.trim().toLowerCase();
     return [
-      for (final r in _requests ?? const <DeletionRequestRecord>[])
-        if (_matches(q, [r.displayName, r.username, r.email])) r,
+      for (final a in _activity ?? const <AuditEntry>[])
+        if (_matches(q, [a.label, a.summary])) a,
     ];
   }
 
@@ -86,8 +88,8 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
         ),
         const SizedBox(width: AppSpacing.sm),
         _FilterTab(
-          label: 'Requests',
-          count: _requests?.length ?? 0,
+          label: 'Activity',
+          count: _activity?.length ?? 0,
           selected: _tab == 1,
           onTap: () => setState(() => _tab = 1),
         ),
@@ -118,14 +120,11 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
               ],
             );
     } else {
-      final requests = _filteredRequests;
-      body = requests.isEmpty
+      final activity = _filteredActivity;
+      body = activity.isEmpty
           ? const _EmptyState()
-          : _AccountList(
-              accounts: requests,
-              busyIds: _busyIds,
-              onApprove: _approve,
-              onReject: _reject,
+          : _CardWrap(
+              children: [for (final entry in activity) _ActivityCard(entry)],
             );
     }
 
@@ -244,71 +243,6 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
       '${user.displayName} was deleted.',
     );
   }
-
-  Future<void> _approve(DeletionRequestRecord request) async {
-    final ok = await _confirm(
-      title: 'Approve deletion?',
-      message: 'This permanently deletes ${request.displayName}\'s account.',
-      action: 'Approve & delete',
-    );
-    if (!ok || !mounted) return;
-    await _run(
-      request.requestId,
-      () => AdminRepository.instance.approveRequest(request),
-      '${request.displayName} approved and removed.',
-    );
-  }
-
-  Future<void> _reject(DeletionRequestRecord request) => _run(
-    request.requestId,
-    () => AdminRepository.instance.rejectRequest(request.requestId),
-    '${request.displayName} rejected.',
-  );
-}
-
-/// One column on phones, two on tablets, three on desktop. Cards keep their
-/// natural height, so this wraps instead of using a fixed-ratio grid.
-class _AccountList extends StatelessWidget {
-  const _AccountList({
-    required this.accounts,
-    required this.busyIds,
-    required this.onApprove,
-    required this.onReject,
-  });
-
-  final List<DeletionRequestRecord> accounts;
-  final Set<String> busyIds;
-  final ValueChanged<DeletionRequestRecord> onApprove;
-  final ValueChanged<DeletionRequestRecord> onReject;
-
-  @override
-  Widget build(BuildContext context) {
-    final columns = context.responsive(mobile: 1, tablet: 2, desktop: 3);
-    const spacing = AppSpacing.md;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width =
-            (constraints.maxWidth - spacing * (columns - 1)) / columns;
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: [
-            for (final account in accounts)
-              SizedBox(
-                width: width,
-                child: _AccountCard(
-                  account: account,
-                  busy: busyIds.contains(account.requestId),
-                  onApprove: () => onApprove(account),
-                  onReject: () => onReject(account),
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
 }
 
 class _SearchField extends StatelessWidget {
@@ -383,128 +317,6 @@ class _FilterTab extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-AppStatus _deletionStatusVisual(DeletionStatus status) => switch (status) {
-  DeletionStatus.pending => AppStatus.warning,
-  DeletionStatus.approved => AppStatus.success,
-  DeletionStatus.rejected => AppStatus.error,
-};
-
-class _AccountCard extends StatelessWidget {
-  const _AccountCard({
-    required this.account,
-    required this.busy,
-    required this.onApprove,
-    required this.onReject,
-  });
-
-  final DeletionRequestRecord account;
-  final bool busy;
-  final VoidCallback onApprove;
-  final VoidCallback onReject;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    final text = context.text;
-    final pending = account.status == DeletionStatus.pending;
-    final statusVisual = _deletionStatusVisual(account.status);
-
-    return AppCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: c.brandGradient,
-              border: Border.all(color: c.glassBorder, width: 1.5),
-            ),
-            child: SizedBox.square(
-              dimension: 48,
-              child: Center(
-                child: Text(
-                  account.initials,
-                  style: text.labelLarge?.copyWith(color: c.onPrimary),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  account.displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: text.titleSmall,
-                ),
-                if (account.email != null)
-                  Text(
-                    account.email!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: text.bodySmall?.copyWith(color: c.textMuted),
-                  ),
-                const SizedBox(height: AppSpacing.sm),
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.xs,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    AppStatusChip(
-                      label: account.status.raw,
-                      status: statusVisual,
-                    ),
-                    Text(
-                      'Requested ${_formatRelativeDate(account.requestedAt)}',
-                      style: text.labelSmall?.copyWith(color: c.textMuted),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          if (busy)
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          else if (pending)
-            Column(
-              children: [
-                _RoundIconButton(
-                  icon: Icons.check_rounded,
-                  color: c.success,
-                  tooltip: 'Approve',
-                  onTap: onApprove,
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                _RoundIconButton(
-                  icon: Icons.close_rounded,
-                  color: c.error,
-                  tooltip: 'Reject',
-                  onTap: onReject,
-                ),
-              ],
-            )
-          else
-            Icon(
-              account.status == DeletionStatus.approved
-                  ? Icons.verified_rounded
-                  : Icons.block_rounded,
-              color: statusVisual.colorIn(c),
-              size: 20,
-            ),
-        ],
       ),
     );
   }
@@ -688,13 +500,55 @@ class _UserCard extends StatelessWidget {
               height: 20,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          else if (!isSelf)
+          else if (!isSelf && !user.isAdmin)
             _RoundIconButton(
               icon: Icons.delete_outline_rounded,
               color: c.error,
               tooltip: 'Delete account',
               onTap: onDelete,
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One line of the admin activity log.
+class _ActivityCard extends StatelessWidget {
+  const _ActivityCard(this.entry);
+
+  final AuditEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final text = context.text;
+    return AppCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.history_rounded, color: c.textMuted),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(entry.label, style: text.titleSmall),
+                if (entry.summary.isNotEmpty)
+                  Text(
+                    entry.summary,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: text.bodySmall?.copyWith(color: c.textMuted),
+                  ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  _formatRelativeDate(entry.createdAt),
+                  style: text.labelSmall?.copyWith(color: c.textMuted),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
