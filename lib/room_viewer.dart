@@ -502,7 +502,10 @@ class _IsoRoomPainter extends CustomPainter {
   void _paintLayout(Canvas canvas, Size size, AnalysisLayout a) {
     final k = _roomW / a.roomWidth; // painter units per mm
     final wallH = (a.roomHeight * k).clamp(60.0, 140.0);
-    final warm = Color.lerp(floor, _Finish.oak, .28)!;
+    final bathroom = _isBathroom(a.furniture);
+    final warm = bathroom
+        ? Color.lerp(floor, const Color(0xFFC9CDD0), .6)!
+        : Color.lerp(floor, _Finish.oak, .28)!;
 
     // the floor, less the notch of an L-shaped room
     var floorPath = Path()
@@ -528,9 +531,20 @@ class _IsoRoomPainter extends CustomPainter {
     final plank = Paint()
       ..color = grid
       ..strokeWidth = 1;
-    final planks = (_roomD / 14).floor();
+    // bathroom floors are square tiles, 600 mm
+    final tile = 600 * k;
+    if (bathroom) {
+      for (var x = tile; x < _roomW; x += tile) {
+        canvas.drawLine(
+          _project(x, 0, 0, size),
+          _project(x, _roomD, 0, size),
+          plank,
+        );
+      }
+    }
+    final planks = bathroom ? (_roomD / tile).floor() : (_roomD / 14).floor();
     for (var i = 1; i < planks; i++) {
-      final y = i * 14.0;
+      final y = i * (bathroom ? tile : 14.0);
       canvas.drawLine(
         _project(0, y, 0, size),
         _project(_roomW, y, 0, size),
@@ -546,7 +560,13 @@ class _IsoRoomPainter extends CustomPainter {
     _nearEdge(canvas, size, a, k, 'south');
     _nearEdge(canvas, size, a, k, 'east');
 
-    final solids = _buildFurniture(a.furniture, k: k, roomD: _roomD);
+    final solids = _buildFurniture(
+      a.furniture,
+      k: k,
+      roomD: _roomD,
+      roomW: a.roomWidth,
+      roomL: a.roomLength,
+    );
     final cosY = math.cos(yaw);
     final sinY = math.sin(yaw);
     double depth(_Solid s) =>
@@ -558,12 +578,17 @@ class _IsoRoomPainter extends CustomPainter {
     final upright =
         [
           for (final s in solids)
-            if (!s.flat) s,
+            if (!s.flat && s.color.a >= 1) s,
         ]..sort((x, y) {
           final byDepth = depth(x).compareTo(depth(y));
           return byDepth != 0 ? byDepth : x.z0.compareTo(y.z0);
         });
-    for (final s in [...flat, ...upright]) {
+    // glass is drawn last, over what stands behind it
+    final glass = [
+      for (final s in solids)
+        if (s.color.a < 1) s,
+    ];
+    for (final s in [...flat, ...upright, ...glass]) {
       _drawSolid(canvas, size, s);
     }
   }
@@ -660,9 +685,10 @@ class _IsoRoomPainter extends CustomPainter {
   }
 
   void _drawSolid(Canvas canvas, Size size, _Solid s) {
-    final top = _tone(s.color, .12);
-    final yShade = _tone(s.color, -.1);
-    final xShade = _tone(s.color, -.26);
+    final alpha = s.color.a;
+    final top = _tone(s.color, .12).withValues(alpha: alpha);
+    final yShade = _tone(s.color, -.1).withValues(alpha: alpha);
+    final xShade = _tone(s.color, -.26).withValues(alpha: alpha);
     if (s.round) {
       const n = 18;
       final rx = (s.x1 - s.x0) / 2;

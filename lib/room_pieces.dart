@@ -43,6 +43,7 @@ Color _pieceColor(String type) => switch (type) {
   'rug' => _Finish.linen,
   'sink' || 'stove' || 'fridge' || 'grab_bar' => _Finish.steel,
   'toilet' || 'washbasin' => _Finish.ceramic,
+  'mirror_light' ||
   'lamp' ||
   'bedside_lamp' ||
   'desk_lamp' ||
@@ -105,6 +106,8 @@ class _PieceCtx {
     required this.index,
     this.base,
     this.carries = false,
+    this.roomW = 0,
+    this.roomL = 0,
   }) : right = _right[item.facing] ?? _right['south']!,
        front = _front[item.facing] ?? _front['south']! {
     final px0 = item.x0 * k;
@@ -150,6 +153,43 @@ class _PieceCtx {
 
   /// Something else stands on this piece, so it keeps its top clear.
   final bool carries;
+
+  /// The room's width and length, mm (0 when unknown).
+  final double roomW;
+  final double roomL;
+
+  /// Which of the piece's own sides (`back`, `front`, `left`, `right`) is
+  /// against a wall of the room.
+  late final Map<String, bool> against = () {
+    if (roomW <= 0 || roomL <= 0) return const <String, bool>{};
+    const edge = 20.0;
+    bool touches(String compass) => switch (compass) {
+      'west' => item.x0 <= edge,
+      'east' => item.x1 >= roomW - edge,
+      'south' => item.y0 <= edge,
+      _ => item.y1 >= roomL - edge,
+    };
+    const opposite = {
+      'north': 'south',
+      'south': 'north',
+      'east': 'west',
+      'west': 'east',
+    };
+    const rightOf = {
+      'south': 'east',
+      'east': 'north',
+      'north': 'west',
+      'west': 'south',
+    };
+    final facing = _front.containsKey(item.facing) ? item.facing : 'south';
+    final right = rightOf[facing]!;
+    return {
+      'front': touches(facing),
+      'back': touches(opposite[facing]!),
+      'right': touches(right),
+      'left': touches(opposite[right]!),
+    };
+  }();
   final Offset right;
   final Offset front;
   final List<_Solid> out = [];
@@ -297,6 +337,7 @@ final Map<String, _PieceBuilder> _pieceBuilders = {
   ..._livingPieces,
   ..._bedroomPieces,
   ..._kitchenPieces,
+  ..._bathroomPieces,
 };
 
 /// The solids of every piece of [furniture], in painter units.
@@ -304,6 +345,8 @@ List<_Solid> _buildFurniture(
   List<AnalysisFurniture> furniture, {
   required double k,
   required double roomD,
+  double roomW = 0,
+  double roomL = 0,
 }) {
   final solids = <_Solid>[];
   // a lamp on a table or desk stands on the tallest piece under its centre
@@ -339,6 +382,8 @@ List<_Solid> _buildFurniture(
       index: i,
       base: host == null ? null : host.height / 1000,
       carries: carriers.contains(item),
+      roomW: roomW,
+      roomL: roomL,
     );
     final builder =
         _pieceBuilders[item.type] ??
@@ -352,3 +397,8 @@ List<_Solid> _buildFurniture(
   }
   return solids;
 }
+
+/// Whether a layout is a bathroom, told from what stands in it.
+bool _isBathroom(List<AnalysisFurniture> furniture) => furniture.any(
+  (f) => f.type == 'toilet' || f.type == 'shower' || f.type == 'washbasin',
+);
