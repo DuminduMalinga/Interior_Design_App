@@ -22,6 +22,7 @@ abstract final class _Finish {
   static const teal = Color(0xFF5F8A87);
   static const caramel = Color(0xFFB0743E);
   static const brass = Color(0xFFC9A45C);
+  static const stone = Color(0xFFD8D7D2);
   static const steel = Color(0xFFDCDFE3);
   static const ceramic = Color(0xFFFAFAF6);
   static const glass = Color(0xFFBFD8E6);
@@ -60,6 +61,7 @@ class _Solid {
     this.z1,
     this.color, {
     this.round = false,
+    this.early = false,
   });
 
   final double x0;
@@ -73,11 +75,15 @@ class _Solid {
   /// An upright cylinder (an ellipse in the footprint) instead of a block.
   final bool round;
 
+  /// Drawn before the other pieces: a block whose top is hidden by what
+  /// stands over it (the carcass under a sink).
+  final bool early;
+
   double get cx => (x0 + x1) / 2;
   double get cy => (y0 + y1) / 2;
 
   /// A rug or mat: drawn before everything that stands on it.
-  bool get flat => z1 <= 1.2 && (x1 - x0) > 8 && (y1 - y0) > 8;
+  bool get flat => early || (z1 <= 1.2 && (x1 - x0) > 8 && (y1 - y0) > 8);
 }
 
 /// Lighter or darker version of [c] (amount -1..1).
@@ -167,8 +173,9 @@ class _PieceCtx {
     double v1,
     double z0,
     double z1,
-    Color color,
-  ) {
+    Color color, {
+    bool early = false,
+  }) {
     final a = Offset(cx, cy) + (right * u0 + front * v0) * m;
     final b = Offset(cx, cy) + (right * u1 + front * v1) * m;
     out.add(
@@ -180,6 +187,7 @@ class _PieceCtx {
         z0 * m,
         z1 * m,
         color,
+        early: early,
       ),
     );
   }
@@ -288,6 +296,7 @@ void _wallPanel(_PieceCtx p) {
 final Map<String, _PieceBuilder> _pieceBuilders = {
   ..._livingPieces,
   ..._bedroomPieces,
+  ..._kitchenPieces,
 };
 
 /// The solids of every piece of [furniture], in painter units.
