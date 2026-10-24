@@ -8,6 +8,46 @@ library;
 
 import 'dart:ui' show Rect;
 
+/// What the user chose to be emailed about (`User.NotificationPrefs`, shared
+/// with the web app).
+class NotificationPrefs {
+  const NotificationPrefs({
+    this.email = true,
+    this.browser = false,
+    this.updates = true,
+  });
+
+  factory NotificationPrefs.fromJson(Object? json) {
+    if (json is! Map) return const NotificationPrefs();
+    return NotificationPrefs(
+      email: json['email'] != false,
+      browser: json['browser'] == true,
+      updates: json['updates'] != false,
+    );
+  }
+
+  /// "Plan ready" and "design saved" emails.
+  final bool email;
+
+  /// Browser alerts; only the web app shows them, the app keeps the choice.
+  final bool browser;
+
+  /// Product news from the admins.
+  final bool updates;
+
+  NotificationPrefs copyWith({bool? email, bool? updates}) => NotificationPrefs(
+    email: email ?? this.email,
+    browser: browser,
+    updates: updates ?? this.updates,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'email': email,
+    'browser': browser,
+    'updates': updates,
+  };
+}
+
 class AppUserProfile {
   const AppUserProfile({
     required this.userId,
@@ -19,6 +59,7 @@ class AppUserProfile {
     this.location,
     this.phone,
     this.lastSignIn,
+    this.notifications = const NotificationPrefs(),
   });
 
   factory AppUserProfile.fromJson(Map<String, dynamic> json) => AppUserProfile(
@@ -30,6 +71,7 @@ class AppUserProfile {
     bio: json['Bio'] as String?,
     location: json['Location'] as String?,
     phone: json['Phone'] as String?,
+    notifications: NotificationPrefs.fromJson(json['NotificationPrefs']),
     lastSignIn: json['LastSignIn'] == null
         ? null
         : DateTime.tryParse(json['LastSignIn'] as String),
@@ -44,6 +86,7 @@ class AppUserProfile {
   final String? location;
   final String? phone;
   final DateTime? lastSignIn;
+  final NotificationPrefs notifications;
 
   bool get isAdmin => role.toLowerCase() == 'admin';
 
@@ -333,64 +376,46 @@ class AdminUserRecord {
   }
 }
 
-enum DeletionStatus {
-  pending,
-  approved,
-  rejected;
-
-  static DeletionStatus fromRaw(String raw) => switch (raw.toLowerCase()) {
-    'approved' => DeletionStatus.approved,
-    'rejected' => DeletionStatus.rejected,
-    _ => DeletionStatus.pending,
-  };
-
-  String get raw => switch (this) {
-    DeletionStatus.pending => 'Pending',
-    DeletionStatus.approved => 'Approved',
-    DeletionStatus.rejected => 'Rejected',
-  };
-}
-
-class DeletionRequestRecord {
-  const DeletionRequestRecord({
-    required this.requestId,
-    required this.userId,
-    required this.status,
-    required this.requestedAt,
-    this.username,
-    this.email,
-    this.fullName,
+/// One line of `AdminAuditLog`: what an admin did, written by the
+/// `delete-user` edge function.
+class AuditEntry {
+  const AuditEntry({
+    required this.action,
+    required this.createdAt,
+    this.actorId,
+    this.targetId,
+    this.detail = const {},
   });
 
-  factory DeletionRequestRecord.fromJson(Map<String, dynamic> json) =>
-      DeletionRequestRecord(
-        requestId: json['RequestID'] as String,
-        userId: json['UserID'] as String,
-        status: DeletionStatus.fromRaw(json['Status'] as String? ?? 'Pending'),
-        requestedAt: DateTime.parse(json['RequestedAt'] as String),
-        username: json['Username'] as String?,
-        email: json['Email'] as String?,
-        fullName: json['FullName'] as String?,
-      );
+  factory AuditEntry.fromJson(Map<String, dynamic> json) => AuditEntry(
+    action: json['Action'] as String? ?? 'unknown',
+    createdAt: DateTime.parse(json['CreatedAt'] as String),
+    actorId: json['ActorID'] as String?,
+    targetId: json['TargetID'] as String?,
+    detail: json['Detail'] is Map
+        ? Map<String, dynamic>.from(json['Detail'] as Map)
+        : const {},
+  );
 
-  final String requestId;
-  final String userId;
-  final DeletionStatus status;
-  final DateTime requestedAt;
-  final String? username;
-  final String? email;
-  final String? fullName;
+  final String action;
+  final DateTime createdAt;
+  final String? actorId;
+  final String? targetId;
+  final Map<String, dynamic> detail;
 
-  String get displayName => fullName ?? username ?? email ?? 'Unknown user';
-
-  String get initials {
-    final name = displayName.trim();
-    final parts = name.split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return '?';
-    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
-    return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
-        .toUpperCase();
+  /// "delete_user" -> "Delete user".
+  String get label {
+    final words = action.replaceAll('_', ' ').trim();
+    return words.isEmpty
+        ? 'Unknown'
+        : words[0].toUpperCase() + words.substring(1);
   }
+
+  /// The detail as short `key: value` text, e.g. the deleted user's email.
+  String get summary => [
+    for (final e in detail.entries)
+      if (e.value != null && '${e.value}'.isNotEmpty) '${e.key}: ${e.value}',
+  ].join(' · ');
 }
 
 // ---------------------------------------------------------------------------

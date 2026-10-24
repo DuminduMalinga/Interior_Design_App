@@ -1,8 +1,11 @@
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../env.dart';
+import 'detector_service.dart';
+import 'layout_service.dart';
 import 'models.dart';
 
 const _uuidGen = Uuid();
@@ -210,6 +213,34 @@ class UserRepository {
     return AppUserProfile.fromJson(row);
   }
 
+  Future<void> saveNotificationPrefs(
+    String userId,
+    NotificationPrefs prefs,
+  ) async {
+    await supa
+        .from('User')
+        .update({'NotificationPrefs': prefs.toJson()})
+        .eq('UserID', userId);
+  }
+
+  /// Asks the server to email the signed-in user (`plan_ready` or
+  /// `design_saved`). The server checks their email switch, so this is safe to
+  /// call every time; it never throws, since a failed email must not break
+  /// the screen.
+  Future<void> emailMe(
+    String kind, [
+    Map<String, Object> params = const {},
+  ]) async {
+    try {
+      await supa.functions.invoke(
+        'send-notification',
+        body: {'kind': kind, 'params': params},
+      );
+    } catch (_) {
+      // ignored on purpose
+    }
+  }
+
   /// Counts the user's floor plans and the rooms detected across them, for
   /// the profile screen's stat tiles.
   Future<({int projects, int rooms})> fetchStats(String userId) async {
@@ -229,47 +260,56 @@ class UserRepository {
     return (projects: floorPlanIds.length, rooms: rooms.length);
   }
 
-  /// Submits an account-deletion request for an admin to review, matching
-  /// the `DeletionRequest` table rather than deleting the account directly.
-  Future<void> requestAccountDeletion(AppUserProfile profile) async {
-    // Same rule as the web app: one pending request per user.
-    final existing = await supa
-        .from('DeletionRequest')
-        .select('RequestID')
-        .eq('UserID', profile.userId)
-        .ilike('Status', 'pending')
-        .maybeSingle();
-    if (existing != null) {
-      throw const AuthException('You already have a pending deletion request.');
+  /// Deletes the signed-in user's own account after checking their password
+  /// (as the web app does): their uploaded floor plans, saved design files and
+  /// picture first, then the account itself, which takes every database row of
+  /// theirs with it.
+  Future<void> deleteMyAccount({
+    required String email,
+    required String password,
+  }) async {
+    final AuthResponse signIn;
+    try {
+      signIn = await supa.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+    } on AuthException {
+      throw const AuthException('The password is not correct.');
     }
-    await supa.from('DeletionRequest').insert({
-      'UserID': profile.userId,
-      'Username': profile.userName,
-      'Email': profile.email,
-      'FullName': profile.fullName,
-      'Status': 'pending',
-    });
+    final userId = signIn.user?.id;
+    if (userId == null) {
+      throw const AuthException('The password is not correct.');
+    }
+
+    for (final bucket in const ['floorplans', 'designs', 'avatars']) {
+      final files = await _listFiles(bucket, userId);
+      for (var i = 0; i < files.length; i += 100) {
+        await supa.storage
+            .from(bucket)
+            .remove(files.sublist(i, math.min(i + 100, files.length)));
+      }
+    }
+    await supa.rpc('delete_my_account');
+    await supa.auth.signOut();
   }
 
-  /// Withdraws the user's own pending deletion request.
-  Future<void> cancelDeletionRequest(String userId) {
-    return supa
-        .from('DeletionRequest')
-        .delete()
-        .eq('UserID', userId)
-        .ilike('Status', 'pending');
-  }
-
-  Future<DeletionRequestRecord?> fetchOwnDeletionRequest(String userId) async {
-    final row = await supa
-        .from('DeletionRequest')
-        .select()
-        .eq('UserID', userId)
-        .order('RequestedAt', ascending: false)
-        .limit(1)
-        .maybeSingle();
-    if (row == null) return null;
-    return DeletionRequestRecord.fromJson(row);
+  /// Every file under a folder of a bucket, at any depth.
+  Future<List<String>> _listFiles(String bucket, String folder) async {
+    final entries = await supa.storage
+        .from(bucket)
+        .list(path: folder, searchOptions: const SearchOptions(limit: 1000));
+    final files = <String>[];
+    for (final entry in entries) {
+      final path = '$folder/${entry.name}';
+      // folders come back without an id
+      if (entry.id != null) {
+        files.add(path);
+      } else {
+        files.addAll(await _listFiles(bucket, path));
+      }
+    }
+    return files;
   }
 }
 
@@ -331,6 +371,49 @@ class FloorPlanRepository {
         .eq('FloorPlanID', floorPlanId)
         .maybeSingle();
     if (row == null) return null;
+    return FloorPlanAnalysisRecord.fromJson(row);
+  }
+
+  /// The uploaded image's bytes, for sending to the wall detector.
+  Future<Uint8List> downloadFloorPlanImage(String path) =>
+      supa.storage.from(SupabaseEnv.floorPlansBucket).download(path);
+
+  /// Runs the wall detector on [floorPlan]'s image and stores the result the
+  /// way the web app does: a `FloorPlanAnalysis` row (`Detected`) and the
+  /// floor plan marked `Analysed`, which the database copies into the room and
+  /// structural-element tables. Returns the stored analysis.
+  Future<FloorPlanAnalysisRecord> runDetection(
+    FloorPlanRecord floorPlan,
+  ) async {
+    final user = supa.auth.currentUser;
+    if (user == null) {
+      throw const LayoutServiceException(
+        'Your session expired. Please sign in again.',
+      );
+    }
+    final bytes = await downloadFloorPlanImage(floorPlan.imagePath);
+    final name = floorPlan.imagePath.split('/').last;
+    final detection = await DetectorService.instance.detect(
+      bytes: bytes,
+      fileName: name,
+      floorPlanId: floorPlan.floorPlanId,
+    );
+    final row = await supa
+        .from('FloorPlanAnalysis')
+        .upsert({
+          'FloorPlanID': floorPlan.floorPlanId,
+          'UserID': user.id,
+          'DetectionJSON': detection,
+          'Status': 'Detected',
+          'UpdatedAt': DateTime.now().toUtc().toIso8601String(),
+        }, onConflict: 'FloorPlanID')
+        .select()
+        .single();
+    await supa
+        .from('FloorPlan')
+        .update({'Status': 'Analysed'})
+        .eq('FloorPlanID', floorPlan.floorPlanId)
+        .eq('UserID', user.id);
     return FloorPlanAnalysisRecord.fromJson(row);
   }
 
@@ -504,6 +587,38 @@ extension GeneratedLayoutPersistence on FloorPlanRepository {
   }
 }
 
+class SavedDesignRepository {
+  SavedDesignRepository._();
+  static final SavedDesignRepository instance = SavedDesignRepository._();
+
+  /// Keeps one furnished room as a saved design (the web's dashboard lists
+  /// these). Saving the same room and layout again replaces the earlier copy.
+  Future<void> save({
+    required String floorPlanId,
+    required String roomId,
+    required String roomName,
+    required AnalysisLayout layout,
+  }) async {
+    final user = supa.auth.currentUser;
+    if (user == null) {
+      throw const LayoutServiceException(
+        'Your session expired. Please sign in again.',
+      );
+    }
+    await supa.from('SavedDesign').upsert({
+      'UserID': user.id,
+      'FloorPlanID': floorPlanId,
+      'RoomID': roomId,
+      'RoomName': roomName,
+      'LayoutType': layout.type,
+      'Title': layout.title,
+      'Score': layout.score,
+      'LayoutJSON': layout.raw,
+      'UpdatedAt': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'FloorPlanID,RoomID,LayoutType');
+  }
+}
+
 class AdminRepository {
   AdminRepository._();
   static final AdminRepository instance = AdminRepository._();
@@ -516,28 +631,21 @@ class AdminRepository {
     return rows.map(AdminUserRecord.fromJson).toList();
   }
 
-  /// Pending requests only, like the web admin page. Matching is
-  /// case-insensitive because older rows were written as `Pending`.
-  Future<List<DeletionRequestRecord>> fetchDeletionRequests() async {
+  /// What admins did, newest first (`AdminAuditLog`; admins can read it).
+  Future<List<AuditEntry>> fetchAuditLog({int limit = 100}) async {
     final rows = await supa
-        .from('DeletionRequest')
+        .from('AdminAuditLog')
         .select()
-        .ilike('Status', 'pending')
-        .order('RequestedAt', ascending: false);
-    return rows.map(DeletionRequestRecord.fromJson).toList();
+        .order('CreatedAt', ascending: false)
+        .limit(limit);
+    return rows.map(AuditEntry.fromJson).toList();
   }
 
-  /// Rejecting removes the request, as the web app does.
-  Future<void> rejectRequest(String requestId) {
-    return supa.from('DeletionRequest').delete().eq('RequestID', requestId);
-  }
-
-  /// Permanently deletes an account (SRS UC3). Mirrors the web app's order:
-  /// the profile row and any requests go first, then the `delete-user` edge
-  /// function removes the auth user after verifying the caller is an admin.
+  /// Permanently deletes a customer's account (SRS UC3). The `delete-user`
+  /// edge function checks the caller is an admin, refuses admin accounts and
+  /// the caller's own, removes the user's files and the auth user (the
+  /// database rows go with it) and writes the audit-log line.
   Future<void> deleteAccount(String userId) async {
-    await supa.from('User').delete().eq('UserID', userId);
-    await supa.from('DeletionRequest').delete().eq('UserID', userId);
     final response = await supa.functions.invoke(
       'delete-user',
       body: {'userId': userId},
@@ -546,14 +654,7 @@ class AdminRepository {
       final error = (response.data is Map)
           ? (response.data as Map)['error']
           : null;
-      throw Exception(
-        'The profile was removed, but sign-in access could not be revoked'
-        '${error == null ? '.' : ': $error'}',
-      );
+      throw Exception(error?.toString() ?? 'The account could not be deleted.');
     }
   }
-
-  /// Approving a deletion request deletes the account.
-  Future<void> approveRequest(DeletionRequestRecord request) =>
-      deleteAccount(request.userId);
 }

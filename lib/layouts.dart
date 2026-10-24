@@ -316,6 +316,22 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
           roomId: widget.room.roomId,
           layout: analysis,
         );
+        // also keep it as a saved design, as the web app does; a failure
+        // here must not undo the layout that was just saved
+        try {
+          await SavedDesignRepository.instance.save(
+            floorPlanId: widget.floorPlanId,
+            roomId: widget.room.roomId,
+            roomName: widget.room.name,
+            layout: analysis,
+          );
+          unawaited(
+            UserRepository.instance.emailMe('design_saved', {
+              'room': widget.room.name,
+              'layout': analysis.title,
+            }),
+          );
+        } catch (_) {}
       } else {
         await FloorPlanRepository.instance.saveSelectedLayout(
           floorPlanId: widget.floorPlanId,
