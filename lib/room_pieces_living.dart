@@ -17,8 +17,6 @@ final Map<String, _PieceBuilder> _livingPieces = {
   'tv': _television,
   'bookshelf': _bookshelf,
   'rug': _rug,
-  'dining_table': _diningTable,
-  'dining_chair': _diningChair,
   'lamp': _floorLamp,
 };
 
@@ -352,22 +350,6 @@ void _rug(_PieceCtx p) {
     .014,
     _Finish.linen,
   );
-}
-
-void _diningTable(_PieceCtx p) {
-  final h = math.max(p.h, .7);
-  const top = .04;
-  p.box(-p.w / 2, p.w / 2, -p.d / 2, p.d / 2, h - top, h, _Finish.oak);
-  p.legs(h - top, _Finish.walnut, r: .035, inset: .09);
-}
-
-/// Pushed in under the table: only the part left showing is in its box.
-void _diningChair(_PieceCtx p) {
-  final h = math.max(p.h, .8);
-  const seat = .45;
-  p.legs(seat, _Finish.walnut, r: .018, inset: .03);
-  p.box(-p.w / 2, p.w / 2, -p.d / 2, p.d / 2, seat - .04, seat, _Finish.blush);
-  p.box(-p.w / 2, p.w / 2, -p.d / 2, -p.d / 2 + .04, seat, h, _Finish.blush);
 }
 
 void _floorLamp(_PieceCtx p) {
