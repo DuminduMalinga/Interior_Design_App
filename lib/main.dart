@@ -28,6 +28,7 @@ part 'profile.dart';
 part 'room_viewer.dart';
 part 'room_pieces.dart';
 part 'room_pieces_living.dart';
+part 'room_pieces_bedroom.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
