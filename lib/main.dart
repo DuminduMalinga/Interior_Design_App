@@ -30,6 +30,7 @@ part 'room_pieces.dart';
 part 'room_pieces_living.dart';
 part 'room_pieces_bedroom.dart';
 part 'room_pieces_kitchen.dart';
+part 'room_pieces_bathroom.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
