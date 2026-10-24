@@ -38,16 +38,17 @@ List<(double, double, double, double)> _fronts(
   required int cols,
   required int rows,
   double gap = .014,
+  double? face,
 }) {
   final fw = (width - gap * (cols - 1)) / cols;
   final fh = (height - gap * (rows - 1)) / rows;
-  final face = p.d / 2;
+  final front = face ?? p.d / 2;
   final out = <(double, double, double, double)>[];
   for (var c = 0; c < cols; c++) {
     for (var r = 0; r < rows; r++) {
       final u = u0 + c * (fw + gap);
       final z = z0 + r * (fh + gap);
-      p.box(u, u + fw, face - .004, face + .016, z, z + fh, color);
+      p.box(u, u + fw, front - .004, front + .016, z, z + fh, color);
       out.add((u, z, fw, fh));
     }
   }
