@@ -437,10 +437,9 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   Timer? _statusTimer;
-  StreamSubscription<FloorPlanAnalysisRecord?>? _analysisSub;
   int _statusIndex = 0;
-  bool _timedOut = false;
   bool _failed = false;
+  String? _error;
 
   static const _statuses = [
     'Detecting rooms...',
@@ -456,45 +455,66 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
       duration: const Duration(milliseconds: 2200),
     )..repeat();
     _statusTimer = Timer(const Duration(milliseconds: 1500), _advanceStatus);
-    _startWatching();
+    _analyse();
   }
 
-  void _startWatching() {
-    _analysisSub?.cancel();
-    _analysisSub = FloorPlanRepository.instance
-        .watchAnalysis(widget.floorPlan.floorPlanId)
-        .listen(
-          _onAnalysisUpdate,
-          onDone: () {
-            if (mounted && !_timedOut) setState(() => _timedOut = true);
-          },
+  /// Opens the rooms when the floor plan has been analysed already,
+  /// otherwise sends its image to the wall detector first.
+  Future<void> _analyse() async {
+    try {
+      var analysis = await FloorPlanRepository.instance.fetchAnalysis(
+        widget.floorPlan.floorPlanId,
+      );
+      var ranDetection = false;
+      if (analysis == null || !analysis.isComplete) {
+        ranDetection = true;
+        analysis = await FloorPlanRepository.instance.runDetection(
+          widget.floorPlan,
         );
+      }
+      if (!mounted) return;
+      if (analysis.isComplete) {
+        if (ranDetection) {
+          unawaited(
+            UserRepository.instance.emailMe('plan_ready', {
+              'rooms': analysis.rooms.length,
+            }),
+          );
+        }
+        _openRoomSelection();
+      } else {
+        setState(() {
+          _failed = true;
+          _error = 'The analysis did not finish.';
+        });
+      }
+    } on LayoutServiceException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _failed = true;
+        _error = e.message;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _failed = true;
+        _error = 'The analysis failed: $e';
+      });
+    }
   }
 
-  void _checkAgain() {
+  void _retry() {
     setState(() {
-      _timedOut = false;
       _failed = false;
+      _error = null;
     });
-    _startWatching();
+    _analyse();
   }
 
   void _advanceStatus() {
     if (!mounted) return;
     setState(() => _statusIndex = (_statusIndex + 1) % _statuses.length);
     _statusTimer = Timer(const Duration(milliseconds: 1800), _advanceStatus);
-  }
-
-  void _onAnalysisUpdate(FloorPlanAnalysisRecord? analysis) {
-    if (!mounted || analysis == null) return;
-    if (analysis.isComplete) {
-      _openRoomSelection();
-    } else if (analysis.isFailed) {
-      setState(() {
-        _timedOut = true;
-        _failed = true;
-      });
-    }
   }
 
   void _openRoomSelection() {
@@ -509,7 +529,6 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
   @override
   void dispose() {
     _statusTimer?.cancel();
-    _analysisSub?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -584,30 +603,25 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
                       const SizedBox(height: AppSpacing.sm),
                       Text(
                         _failed
-                            ? 'The analysis failed for this floor plan. Try '
-                                  'uploading a clearer image.'
-                            : _timedOut
-                            ? 'No analysis has arrived yet. Floor plans are '
-                                  'analysed by the web app, so open this one '
-                                  'there, then check again.'
+                            ? (_error ??
+                                  'The analysis failed for this floor plan.')
                             : 'Our AI is analyzing every detail',
                         textAlign: TextAlign.center,
                         style: text.bodySmall?.copyWith(color: c.textMuted),
                       ),
                       const SizedBox(height: AppSpacing.xl),
-                      if (_timedOut)
+                      if (_failed)
                         Wrap(
                           alignment: WrapAlignment.center,
                           spacing: AppSpacing.md,
                           runSpacing: AppSpacing.md,
                           children: [
-                            if (!_failed)
-                              AppButton(
-                                label: 'Check again',
-                                icon: Icons.refresh_rounded,
-                                expanded: false,
-                                onPressed: _checkAgain,
-                              ),
+                            AppButton(
+                              label: 'Try again',
+                              icon: Icons.refresh_rounded,
+                              expanded: false,
+                              onPressed: _retry,
+                            ),
                             AppButton(
                               label: 'Back to dashboard',
                               expanded: false,

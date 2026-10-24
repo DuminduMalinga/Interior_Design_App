@@ -28,11 +28,10 @@ String _monthYear(DateTime dt) {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  bool _notificationsEnabled = true;
+  NotificationPrefs _prefs = const NotificationPrefs();
   AppUserProfile? _profile;
   bool _isAdmin = false;
   ({int projects, int rooms})? _stats;
-  DeletionRequestRecord? _deletionRequest;
 
   @override
   void didChangeDependencies() {
@@ -47,15 +46,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
       UserRepository.instance.fetchProfile(user.id),
       UserRepository.instance.fetchStats(user.id),
       AuthService.instance.isAdmin(),
-      UserRepository.instance.fetchOwnDeletionRequest(user.id),
     ]);
     if (!mounted) return;
     setState(() {
       _profile = results[0] as AppUserProfile?;
+      _prefs = _profile?.notifications ?? const NotificationPrefs();
       _stats = results[1] as ({int projects, int rooms});
       _isAdmin = results[2] as bool;
-      _deletionRequest = results[3] as DeletionRequestRecord?;
     });
+  }
+
+  /// Saves a notification choice to the account (shared with the web app),
+  /// putting the switch back if that fails.
+  Future<void> _setPrefs(NotificationPrefs next) async {
+    final user = AuthService.instance.currentUser;
+    if (user == null) return;
+    final before = _prefs;
+    setState(() => _prefs = next);
+    try {
+      await UserRepository.instance.saveNotificationPrefs(user.id, next);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _prefs = before);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save that choice. Try again.')),
+      );
+    }
   }
 
   @override
@@ -115,12 +131,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   : () => _editProfile(context, profile),
             ),
             _SettingsTile(
-              icon: Icons.notifications_none_rounded,
-              title: 'Push notifications',
+              icon: Icons.mark_email_unread_outlined,
+              title: 'Email notifications',
+              subtitle: 'Plan ready and design saved',
               trailing: Switch(
-                value: _notificationsEnabled,
+                value: _prefs.email,
                 activeThumbColor: c.primary,
-                onChanged: (v) => setState(() => _notificationsEnabled = v),
+                onChanged: (v) => _setPrefs(_prefs.copyWith(email: v)),
+              ),
+            ),
+            _SettingsTile(
+              icon: Icons.campaign_outlined,
+              title: 'Product news',
+              subtitle: 'Updates from the InteriorAI team',
+              trailing: Switch(
+                value: _prefs.updates,
+                activeThumbColor: c.primary,
+                onChanged: (v) => _setPrefs(_prefs.copyWith(updates: v)),
               ),
             ),
             _SettingsTile(
@@ -172,17 +199,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             _SettingsTile(
               icon: Icons.delete_outline_rounded,
-              title: _deletionRequest?.status == DeletionStatus.pending
-                  ? 'Account deletion requested'
-                  : 'Delete my account',
-              subtitle: _deletionRequest?.status == DeletionStatus.pending
-                  ? 'An admin will review it. Tap to cancel the request'
-                  : 'Submit a request for an admin to review',
+              title: 'Delete my account',
+              subtitle: 'Permanently removes your account and files',
               onTap: profile == null
                   ? null
-                  : _deletionRequest?.status == DeletionStatus.pending
-                  ? () => _cancelDeletionRequest(context, profile)
-                  : () => _requestDeletion(context, profile),
+                  : () => _deleteAccount(context, profile),
             ),
           ],
         ),
@@ -262,83 +283,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (updated == true) _load();
   }
 
-  Future<void> _requestDeletion(
+  /// Deletes the account after the user types their password (as on the web).
+  Future<void> _deleteAccount(
     BuildContext context,
     AppUserProfile profile,
   ) async {
-    final confirmed = await showDialog<bool>(
+    final controller = TextEditingController();
+    final password = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete your account?'),
-        content: const Text(
-          "This sends a request to an admin to permanently delete your "
-          "account. You'll keep access until it's approved.",
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'This permanently deletes your account, floor plans and saved '
+              'designs. It cannot be undone. Enter your password to confirm.',
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: controller,
+              obscureText: true,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Password'),
+            ),
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Request deletion'),
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+            child: const Text('Delete account'),
           ),
         ],
       ),
     );
-    if (confirmed != true) return;
+    controller.dispose();
+    if (password == null || password.isEmpty) return;
     try {
-      await UserRepository.instance.requestAccountDeletion(profile);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Deletion request submitted.')),
+      await UserRepository.instance.deleteMyAccount(
+        email: profile.email,
+        password: password,
       );
-      _load();
+      if (!context.mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => const AuthScreen()),
+        (route) => false,
+      );
     } catch (error) {
       if (!context.mounted) return;
       final message = error is AuthException
           ? error.message
-          : 'Could not submit the request. Please try again.';
+          : 'Could not delete the account. Please try again.';
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
-    }
-  }
-
-  Future<void> _cancelDeletionRequest(
-    BuildContext context,
-    AppUserProfile profile,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Cancel deletion request?'),
-        content: const Text('Your account will stay as it is.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Keep request'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Cancel request'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    try {
-      await UserRepository.instance.cancelDeletionRequest(profile.userId);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Deletion request cancelled.')),
-      );
-      _load();
-    } catch (_) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not cancel the request.')),
-      );
     }
   }
 
