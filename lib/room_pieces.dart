@@ -21,6 +21,7 @@ abstract final class _Finish {
   static const mustard = Color(0xFFD2A54A);
   static const teal = Color(0xFF5F8A87);
   static const caramel = Color(0xFFB0743E);
+  static const brass = Color(0xFFC9A45C);
   static const steel = Color(0xFFDCDFE3);
   static const ceramic = Color(0xFFFAFAF6);
   static const glass = Color(0xFFBFD8E6);
@@ -96,6 +97,8 @@ class _PieceCtx {
     required this.k,
     required this.roomD,
     required this.index,
+    this.base,
+    this.carries = false,
   }) : right = _right[item.facing] ?? _right['south']!,
        front = _front[item.facing] ?? _front['south']! {
     final px0 = item.x0 * k;
@@ -135,6 +138,12 @@ class _PieceCtx {
 
   /// Position in the layout; picks a cushion colour or a prop.
   final int index;
+
+  /// For a lamp on a table or desk: the top of what it stands on, metres.
+  final double? base;
+
+  /// Something else stands on this piece, so it keeps its top clear.
+  final bool carries;
   final Offset right;
   final Offset front;
   final List<_Solid> out = [];
@@ -276,7 +285,10 @@ void _wallPanel(_PieceCtx p) {
 
 /// Which builder draws each furniture type. A room's file adds its own with
 /// the `_<room>Pieces` maps merged here.
-final Map<String, _PieceBuilder> _pieceBuilders = {..._livingPieces};
+final Map<String, _PieceBuilder> _pieceBuilders = {
+  ..._livingPieces,
+  ..._bedroomPieces,
+};
 
 /// The solids of every piece of [furniture], in painter units.
 List<_Solid> _buildFurniture(
@@ -285,11 +297,40 @@ List<_Solid> _buildFurniture(
   required double roomD,
 }) {
   final solids = <_Solid>[];
+  // a lamp on a table or desk stands on the tallest piece under its centre
+  AnalysisFurniture? hostOf(AnalysisFurniture lamp) {
+    final x = (lamp.x0 + lamp.x1) / 2;
+    final y = (lamp.y0 + lamp.y1) / 2;
+    AnalysisFurniture? host;
+    for (final other in furniture) {
+      if (other == lamp || other.mounted != null && other.mounted != 'floor') {
+        continue;
+      }
+      if (x >= other.x0 && x <= other.x1 && y >= other.y0 && y <= other.y1) {
+        if (host == null || other.height > host.height) host = other;
+      }
+    }
+    return host;
+  }
+
+  final hosts = <AnalysisFurniture, AnalysisFurniture>{
+    for (final lamp in furniture)
+      if (lamp.mounted == 'table') lamp: ?hostOf(lamp),
+  };
+  final carriers = hosts.values.toSet();
   for (var i = 0; i < furniture.length; i++) {
     final item = furniture[i];
     // ceiling lights and floor drains take up no room to draw
     if (item.mounted == 'ceiling' || item.mounted == 'drain') continue;
-    final p = _PieceCtx(item: item, k: k, roomD: roomD, index: i);
+    final host = hosts[item];
+    final p = _PieceCtx(
+      item: item,
+      k: k,
+      roomD: roomD,
+      index: i,
+      base: host == null ? null : host.height / 1000,
+      carries: carriers.contains(item),
+    );
     final builder =
         _pieceBuilders[item.type] ??
         (item.mounted == 'wall' ? _wallPanel : _plainPiece);
