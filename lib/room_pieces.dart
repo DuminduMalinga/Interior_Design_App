@@ -338,6 +338,7 @@ final Map<String, _PieceBuilder> _pieceBuilders = {
   ..._bedroomPieces,
   ..._kitchenPieces,
   ..._bathroomPieces,
+  ..._diningPieces,
 };
 
 /// The solids of every piece of [furniture], in painter units.
