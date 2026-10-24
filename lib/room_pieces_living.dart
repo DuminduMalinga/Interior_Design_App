@@ -19,8 +19,6 @@ final Map<String, _PieceBuilder> _livingPieces = {
   'rug': _rug,
   'dining_table': _diningTable,
   'dining_chair': _diningChair,
-  'desk': _desk,
-  'desk_chair': _deskChair,
   'lamp': _floorLamp,
 };
 
@@ -193,6 +191,7 @@ void _coffeeTable(_PieceCtx p) {
       );
     }
   }
+  if (p.carries) return;
   _books(p, -p.w * .2, 0.02, h, count: 3);
   _bowl(p, p.w * .22, -.02, h);
 }
@@ -203,6 +202,7 @@ void _sideTable(_PieceCtx p) {
   p.cyl(0, 0, r, h - .022, h, _Finish.oak);
   p.cyl(0, 0, .016, 0, h - .022, _Finish.black);
   p.cyl(0, 0, r * .58, 0, .014, _Finish.black);
+  if (p.carries) return;
   if (p.index.isEven) {
     _plant(p, 0, 0, h);
   } else {
@@ -230,6 +230,7 @@ void _tvConsole(_PieceCtx p) {
       _Finish.oakDark,
     );
   }
+  if (p.carries) return;
   p.box(
     -math.min(.4, p.w * .22),
     math.min(.4, p.w * .22),
@@ -367,31 +368,6 @@ void _diningChair(_PieceCtx p) {
   p.legs(seat, _Finish.walnut, r: .018, inset: .03);
   p.box(-p.w / 2, p.w / 2, -p.d / 2, p.d / 2, seat - .04, seat, _Finish.blush);
   p.box(-p.w / 2, p.w / 2, -p.d / 2, -p.d / 2 + .04, seat, h, _Finish.blush);
-}
-
-void _desk(_PieceCtx p) {
-  final h = math.max(p.h, .7);
-  const top = .03;
-  p.box(-p.w / 2, p.w / 2, -p.d / 2, p.d / 2, h - top, h, _Finish.oak);
-  p.legs(h - top, _Finish.black, r: .02, inset: .04);
-  _books(p, p.w / 2 - .25, -p.d / 2 + .15, h, count: 2);
-}
-
-void _deskChair(_PieceCtx p) {
-  final h = math.max(p.h, .8);
-  const seat = .46;
-  p.cyl(0, 0, .22, 0, .05, _Finish.charcoal);
-  p.cyl(0, 0, .03, .05, seat - .06, _Finish.black);
-  p.box(
-    -p.w / 2,
-    p.w / 2,
-    -p.d / 2,
-    p.d / 2,
-    seat - .06,
-    seat,
-    _Finish.charcoal,
-  );
-  p.box(-p.w / 2, p.w / 2, -p.d / 2, -p.d / 2 + .06, seat, h, _Finish.charcoal);
 }
 
 void _floorLamp(_PieceCtx p) {

@@ -483,6 +483,7 @@ class AnalysisFurniture {
     this.mounted,
     this.mountHeight,
     this.shape,
+    this.model,
     this.parts = const [],
   });
 
@@ -513,6 +514,7 @@ class AnalysisFurniture {
       mounted: json['mounted'] as String?,
       mountHeight: _asDouble(json['mount_height']),
       shape: json['shape'] as String?,
+      model: json['model']?.toString(),
       parts: [
         if (json['parts'] is List)
           for (final part in json['parts'] as List)
@@ -541,6 +543,9 @@ class AnalysisFurniture {
 
   /// `l` for a corner piece, whose footprint is [parts] (each `[x0, y0, x1, y1]`, mm).
   final String? shape;
+
+  /// Which version of the piece this is (e.g. a wardrobe's `3-door`).
+  final String? model;
   final List<List<double>> parts;
 
   String get label => type
