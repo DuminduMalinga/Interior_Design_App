@@ -39,6 +39,7 @@ A few things worth knowing before you dig into the code:
 - Room detection and selection experience with per-room suitability scores
 - Layout recommendation gallery with a recommended pick, confirm-and-save selection and a 3D gate - â€” a swipeable deck on mobile, a grid on wider screens
 - A 3D room viewer: drag to orbit, pinch or button to zoom
+- Light and dark themes: Profile → Appearance switches between them at once and remembers the choice on the device (dark by default, as on the web)
 - Profile screen (stats, settings, sign out) and admin account moderation (search, filter, approve/reject)
 - Dark, responsive UI built from a shared theme and component library
 
