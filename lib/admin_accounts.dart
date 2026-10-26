@@ -14,6 +14,9 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
   final _searchController = TextEditingController();
   String _query = '';
   int _tab = 0; // 0 = accounts, 1 = activity
+  RoleFilter _role = RoleFilter.all;
+  UserSort _sort = UserSort.name;
+  bool _ascending = true;
   List<AdminUserRecord>? _users;
   List<AuditEntry>? _activity;
   bool _loadFailed = false;
@@ -53,13 +56,22 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
   bool _matches(String q, Iterable<String?> fields) =>
       q.isEmpty || fields.any((f) => (f ?? '').toLowerCase().contains(q));
 
-  List<AdminUserRecord> get _filteredUsers {
-    final q = _query.trim().toLowerCase();
-    return [
-      for (final u in _users ?? const <AdminUserRecord>[])
-        if (_matches(q, [u.fullName, u.userName, u.email])) u,
-    ];
-  }
+  List<AdminUserRecord> get _filteredUsers => AdminUserList.apply(
+    _users ?? const <AdminUserRecord>[],
+    query: _query,
+    filter: _role,
+    sort: _sort,
+    ascending: _ascending,
+  );
+
+  /// Whether a search or a role filter is narrowing the list.
+  bool get _filtering => _query.trim().isNotEmpty || _role != RoleFilter.all;
+
+  void _clearFilters() => setState(() {
+    _searchController.clear();
+    _query = '';
+    _role = RoleFilter.all;
+  });
 
   List<AuditEntry> get _filteredActivity {
     final q = _query.trim().toLowerCase();
@@ -107,7 +119,7 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
     } else if (_tab == 0) {
       final users = _filteredUsers;
       body = users.isEmpty
-          ? const _EmptyState()
+          ? _EmptyState(onClear: _filtering ? _clearFilters : null)
           : _CardWrap(
               children: [
                 for (final user in users)
@@ -167,6 +179,34 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
                       search,
                       const SizedBox(height: AppSpacing.md),
                       tabs,
+                    ],
+                    if (_tab == 0 && _users != null) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: RoleFilterChips(
+                              counts: AdminUserList.counts(_users!),
+                              selected: _role,
+                              onSelect: (r) => setState(() => _role = r),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          UserSortMenu(
+                            field: _sort,
+                            ascending: _ascending,
+                            onPick: (field) => setState(() {
+                              _ascending = AdminUserList.directionAfterPicking(
+                                field,
+                                current: _sort,
+                                ascending: _ascending,
+                              );
+                              _sort = field;
+                            }),
+                          ),
+                        ],
+                      ),
                     ],
                     const SizedBox(height: AppSpacing.xl),
                     body,
@@ -562,7 +602,10 @@ class _RoundIconButton extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  const _EmptyState({this.onClear});
+
+  /// Clears the search and role filter; null when none is applied.
+  final VoidCallback? onClear;
 
   @override
   Widget build(BuildContext context) {
@@ -583,6 +626,13 @@ class _EmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
               style: context.text.bodySmall?.copyWith(color: c.textMuted),
             ),
+            if (onClear != null) ...[
+              const SizedBox(height: AppSpacing.lg),
+              TextButton(
+                onPressed: onClear,
+                child: const Text('Clear filters'),
+              ),
+            ],
           ],
         ),
       ),
@@ -639,21 +689,10 @@ class _UserCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: c.brandGradient,
-              border: Border.all(color: c.glassBorder, width: 1.5),
-            ),
-            child: SizedBox.square(
-              dimension: 48,
-              child: Center(
-                child: Text(
-                  user.initials,
-                  style: text.labelLarge?.copyWith(color: c.onPrimary),
-                ),
-              ),
-            ),
+          AppAvatar(
+            initials: user.initials,
+            imageUrl: user.avatarUrl,
+            size: 48,
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -754,3 +793,18 @@ class _ActivityCard extends StatelessWidget {
     );
   }
 }
+
+/// One account card, so tests can see it without loading the admin list from
+/// the database.
+@visibleForTesting
+Widget adminUserCardForTest(
+  AdminUserRecord user, {
+  bool isSelf = false,
+  bool busy = false,
+  VoidCallback? onDelete,
+}) => _UserCard(
+  user: user,
+  isSelf: isSelf,
+  busy: busy,
+  onDelete: onDelete ?? () {},
+);
