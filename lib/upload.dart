@@ -9,6 +9,9 @@ class UploadScreen extends StatefulWidget {
 
 class _UploadScreenState extends State<UploadScreen> {
   PlatformFile? _picked;
+
+  /// The chosen image's bytes: shown as a preview, and sent when uploading.
+  Uint8List? _preview;
   bool _uploading = false;
 
   bool get _selected => _picked != null;
@@ -22,6 +25,7 @@ class _UploadScreenState extends State<UploadScreen> {
     final dropzone = _UploadDropzone(
       selected: _selected,
       fileName: _picked?.name,
+      previewBytes: _preview,
       onSelect: _pickFile,
     );
     final details = Column(
@@ -117,7 +121,21 @@ class _UploadScreenState extends State<UploadScreen> {
       ).showSnackBar(SnackBar(content: Text(problem)));
       return;
     }
-    setState(() => _picked = file);
+    final Uint8List bytes;
+    try {
+      bytes = await file.readAsBytes();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('That image could not be read.')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _picked = file;
+      _preview = bytes;
+    });
   }
 
   Future<void> _submit() async {
@@ -127,7 +145,7 @@ class _UploadScreenState extends State<UploadScreen> {
 
     setState(() => _uploading = true);
     try {
-      final bytes = await file.readAsBytes();
+      final bytes = _preview ?? await file.readAsBytes();
       final ext = (file.extension ?? 'jpg').toLowerCase();
       final path = await FloorPlanRepository.instance.uploadFloorPlanImage(
         userId: user.id,
@@ -142,6 +160,7 @@ class _UploadScreenState extends State<UploadScreen> {
       setState(() {
         _uploading = false;
         _picked = null;
+        _preview = null;
       });
       _openProcessing(context, floorPlan);
     } catch (error) {
@@ -167,10 +186,14 @@ class _UploadDropzone extends StatelessWidget {
     required this.selected,
     required this.onSelect,
     this.fileName,
+    this.previewBytes,
   });
 
   final bool selected;
   final String? fileName;
+
+  /// The chosen image, shown in place of the upload icon.
+  final Uint8List? previewBytes;
   final VoidCallback onSelect;
 
   @override
@@ -201,28 +224,33 @@ class _UploadDropzone extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [
-                      c.primary.withValues(alpha: 0.28),
-                      c.secondary.withValues(alpha: 0.22),
-                    ],
+              if (previewBytes != null)
+                _PlanPreview(bytes: previewBytes!)
+              else
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        c.primary.withValues(alpha: 0.28),
+                        c.secondary.withValues(alpha: 0.22),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: c.primary.withValues(alpha: 0.35),
+                    ),
                   ),
-                  border: Border.all(color: c.primary.withValues(alpha: 0.35)),
-                ),
-                child: SizedBox.square(
-                  dimension: 72,
-                  child: Icon(
-                    selected
-                        ? Icons.check_rounded
-                        : Icons.cloud_upload_outlined,
-                    color: c.textPrimary,
-                    size: 32,
+                  child: SizedBox.square(
+                    dimension: 72,
+                    child: Icon(
+                      selected
+                          ? Icons.check_rounded
+                          : Icons.cloud_upload_outlined,
+                      color: c.textPrimary,
+                      size: 32,
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(height: AppSpacing.lg),
               Text(
                 selected ? 'Floor plan selected' : 'Upload your floor plan',
@@ -247,7 +275,9 @@ class _UploadDropzone extends StatelessWidget {
                 children: [
                   _UploadAction(
                     icon: Icons.photo_library_outlined,
-                    label: 'Choose image',
+                    label: selected
+                        ? 'Choose a different image'
+                        : 'Choose image',
                     onTap: onSelect,
                   ),
                 ],
@@ -805,3 +835,57 @@ class _ScanlinePainter extends CustomPainter {
   bool shouldRepaint(covariant _ScanlinePainter oldDelegate) =>
       oldDelegate.line != line || oldDelegate.glow != glow;
 }
+
+/// The floor plan the user picked, shown before it is uploaded so they can
+/// check it is the right one and readable. Plans are drawn on white, so the
+/// sheet is white in both themes.
+class _PlanPreview extends StatelessWidget {
+  const _PlanPreview({required this.bytes});
+
+  final Uint8List bytes;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 220),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFFFF),
+        borderRadius: AppRadius.lgAll,
+        border: Border.all(color: c.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Image.memory(
+        bytes,
+        fit: BoxFit.contain,
+        // a big plan needs no more pixels than the preview shows
+        cacheWidth: 1200,
+        gaplessPlayback: true,
+        semanticLabel: 'Preview of your floor plan',
+        errorBuilder: (context, error, stackTrace) => SizedBox(
+          height: 120,
+          child: Center(
+            child: Icon(Icons.image_not_supported_outlined, color: c.textMuted),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The upload area, so tests can see it without picking a file from the
+/// device.
+@visibleForTesting
+Widget uploadDropzoneForTest({
+  bool selected = false,
+  String? fileName,
+  Uint8List? previewBytes,
+  VoidCallback? onSelect,
+}) => _UploadDropzone(
+  selected: selected,
+  fileName: fileName,
+  previewBytes: previewBytes,
+  onSelect: onSelect ?? () {},
+);
