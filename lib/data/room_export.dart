@@ -44,3 +44,16 @@ ShareParams pictureShareParams({
   // iPad anchors its share popover to this
   sharePositionOrigin: origin,
 );
+
+/// What to hand the system share sheet for a room's 3D model.
+ShareParams modelShareParams({
+  required Uint8List glb,
+  required String fileName,
+  required String text,
+  Rect? origin,
+}) => ShareParams(
+  text: text,
+  files: [XFile.fromData(glb, mimeType: 'model/gltf-binary')],
+  fileNameOverrides: [fileName],
+  sharePositionOrigin: origin,
+);
