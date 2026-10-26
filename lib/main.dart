@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_components.dart';
@@ -10,6 +12,7 @@ import 'app_theme.dart';
 import 'data/avatar.dart';
 import 'data/layout_service.dart';
 import 'data/models.dart';
+import 'data/room_export.dart';
 import 'data/site_news.dart';
 import 'data/supabase_service.dart';
 import 'env.dart';
