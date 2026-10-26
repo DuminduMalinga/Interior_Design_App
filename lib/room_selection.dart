@@ -47,7 +47,20 @@ class _DetectedRoom {
     required this.note,
     this.fromAnalysis = false,
     this.layoutsSupported = true,
+    this.outline,
+    this.confidence,
+    this.sizeNote,
   });
+
+  /// The room's outline on the plan image as fractions (0-1), when the
+  /// detection recorded where it is.
+  final List<Offset>? outline;
+
+  /// How sure the detector is it found a room here (0-1).
+  final double? confidence;
+
+  /// Where the size on [note] came from, e.g. "from the plan's printed area".
+  final String? sizeNote;
 
   /// True when this room came from the web pipeline's `DetectionJSON` (its id
   /// is a detector id like `room-2`, not a `Room` table key).
@@ -116,19 +129,29 @@ Rect _boundsForIndex(int index, int total) {
   return Rect.fromLTWH(col * (w + gap), row * (h + gap), w, h);
 }
 
-/// "4.2m × 3.1m · 13.0 m²", marking sizes the detector only estimated.
-String _analysisRoomNote(AnalysisRoom room) {
-  final w = room.widthM;
-  final h = room.heightM;
-  final area = room.areaM2;
-  if (w == null || h == null || area == null) {
-    return 'Size unknown — the plan has no printed scale';
-  }
-  return '${w.toStringAsFixed(1)}m × ${h.toStringAsFixed(1)}m · '
-      '${area.toStringAsFixed(1)} m² (estimated)';
+/// What the room-selection screen shows: the rooms, and the plan they sit on.
+class _RoomSelectionData {
+  const _RoomSelectionData({
+    required this.rooms,
+    this.planUrl,
+    this.aspectRatio = 4 / 3,
+    this.counts = const {},
+  });
+
+  final List<_DetectedRoom> rooms;
+
+  /// A short-lived link to the uploaded plan image, when it could be made.
+  final String? planUrl;
+  final double aspectRatio;
+  final Map<String, int> counts;
+
+  /// Whether every room has a position, so the plan can be drawn truthfully;
+  /// otherwise the screen falls back to its schematic diagram.
+  bool get canOverlay =>
+      rooms.isNotEmpty && rooms.every((r) => r.outline != null);
 }
 
-Future<List<_DetectedRoom>> _loadDetectedRooms(
+Future<_RoomSelectionData> _loadDetectedRooms(
   FloorPlanRecord floorPlan,
   AppColors c,
 ) async {
@@ -138,10 +161,19 @@ Future<List<_DetectedRoom>> _loadDetectedRooms(
   final analysis = await FloorPlanRepository.instance.fetchAnalysis(
     floorPlan.floorPlanId,
   );
-  final analysisRooms = analysis?.rooms ?? const <AnalysisRoom>[];
+  final plan = analysis?.plan ?? AnalysisPlan.empty;
+  final analysisRooms = plan.rooms;
   if (analysisRooms.isNotEmpty) {
     final layoutSet = AnalysisLayoutSet.from(analysis?.layoutJson);
-    return [
+    String? planUrl;
+    try {
+      planUrl = await FloorPlanRepository.instance.signedUrlFor(
+        floorPlan.imagePath,
+      );
+    } catch (_) {
+      // the outlines still show without the picture
+    }
+    final rooms = [
       for (final (i, room) in analysisRooms.indexed)
         _DetectedRoom(
           roomId: room.id,
@@ -149,6 +181,9 @@ Future<List<_DetectedRoom>> _loadDetectedRooms(
           icon: _iconForRoomType(room.name),
           accent: accents[i % accents.length],
           bounds: room.bboxFraction ?? _boundsForIndex(i, analysisRooms.length),
+          outline: room.outline,
+          confidence: room.confidence,
+          sizeNote: plan.sizeOf(room)?.note,
           suitability:
               layoutSet != null &&
                   layoutSet.roomId == room.id &&
@@ -162,11 +197,17 @@ Future<List<_DetectedRoom>> _loadDetectedRooms(
                     .round()
                     .clamp(0, 100)
               : 0,
-          note: _analysisRoomNote(room),
+          note: _sizeLine(plan.sizeOf(room)),
           fromAnalysis: true,
           layoutsSupported: RoomKind.fromName(room.name)?.isSupported ?? false,
         ),
     ];
+    return _RoomSelectionData(
+      rooms: rooms,
+      planUrl: planUrl,
+      aspectRatio: plan.aspectRatio,
+      counts: plan.counts,
+    );
   }
 
   // Older relational pipeline: rows in the `Room` / `Layout` tables.
@@ -196,39 +237,56 @@ Future<List<_DetectedRoom>> _loadDetectedRooms(
       ),
     );
   }
-  return result;
+  return _RoomSelectionData(rooms: result);
 }
 
+/// "4.20 × 3.10 m · 13.0 m²", or a plain note when the plan gave no size.
+String _sizeLine(RoomSize? size) =>
+    size == null ? 'Size unknown' : '${size.dims} · ${size.area}';
+
 class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
-  int _selected = 0;
-  List<_DetectedRoom>? _rooms;
+  /// Index into the loaded rooms of the chosen one; none until one that can
+  /// be furnished exists.
+  int? _selected;
+  _RoomSelectionData? _data;
   bool _loadFailed = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_rooms == null) _load();
+    if (_data == null) _load();
   }
 
   Future<void> _load() async {
     final colors = context.colors;
     setState(() => _loadFailed = false);
     try {
-      final rooms = await _loadDetectedRooms(widget.floorPlan, colors);
+      final data = await _loadDetectedRooms(widget.floorPlan, colors);
       if (!mounted) return;
-      setState(() => _rooms = rooms);
+      setState(() {
+        _data = data;
+        // start on the first room that can be furnished, if there is one
+        final first = data.rooms.indexWhere((r) => r.layoutsSupported);
+        _selected = first == -1 ? null : first;
+      });
     } catch (_) {
       if (!mounted) return;
       setState(() => _loadFailed = true);
     }
   }
 
+  void _say(String message) => ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(message)));
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final text = context.text;
     final wide = !context.screenSize.isMobile;
-    final rooms = _rooms;
+    final data = _data;
+    final rooms = data?.rooms;
+    final furnishable = rooms?.where((r) => r.layoutsSupported).length ?? 0;
 
     Widget body;
     if (_loadFailed && rooms == null) {
@@ -261,30 +319,97 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
         ),
       );
     } else {
-      final room = rooms[_selected.clamp(0, rooms.length - 1)];
-      final diagram = _FloorPlanDiagram(
-        rooms: rooms,
-        selected: _selected,
-        onSelect: (i) => setState(() => _selected = i),
+      final selected = _selected;
+      final room = selected == null ? null : rooms[selected];
+      // The real plan with each room's outline on it; rooms the detection
+      // gave no position for fall back to the schematic diagram.
+      final Widget diagram = data!.canOverlay
+          ? PlanOverlay(
+              rooms: [
+                for (final r in rooms)
+                  PlanOverlayRoom(
+                    name: r.name,
+                    outline: r.outline!,
+                    selectable: r.layoutsSupported,
+                  ),
+              ],
+              aspectRatio: data.aspectRatio,
+              imageUrl: data.planUrl,
+              counts: data.counts,
+              selected: selected,
+              onSelect: (i) => setState(() => _selected = i),
+              onBlocked: (i) =>
+                  _say("${rooms[i].name} can't be furnished yet."),
+            )
+          : _FloorPlanDiagram(
+              rooms: rooms,
+              selected: selected ?? -1,
+              onSelect: (i) {
+                if (rooms[i].layoutsSupported) {
+                  setState(() => _selected = i);
+                } else {
+                  _say("${rooms[i].name} can't be furnished yet.");
+                }
+              },
+            );
+
+      Widget cards(Iterable<int> indexes, {required bool enabled}) => Column(
+        children: [
+          for (final i in indexes) ...[
+            _RoomCard(
+              room: rooms[i],
+              selected: i == selected,
+              enabled: enabled,
+              onTap: () => setState(() => _selected = i),
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+        ],
       );
+      final ready = [
+        for (var i = 0; i < rooms.length; i++)
+          if (rooms[i].layoutsSupported) i,
+      ];
+      final blocked = [
+        for (var i = 0; i < rooms.length; i++)
+          if (!rooms[i].layoutsSupported) i,
+      ];
+
       final list = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Detected rooms', style: text.titleMedium),
+          Text('Ready to furnish ($furnishable)', style: text.titleMedium),
           const SizedBox(height: AppSpacing.md),
-          for (var i = 0; i < rooms.length; i++) ...[
-            _RoomCard(
-              room: rooms[i],
-              selected: i == _selected,
-              onTap: () => setState(() => _selected = i),
+          if (ready.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              child: Text(
+                'None of the rooms in this plan can be furnished yet.',
+                style: text.bodySmall?.copyWith(color: c.textMuted),
+              ),
+            )
+          else
+            cards(ready, enabled: true),
+          if (blocked.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              "Can't furnish yet (${blocked.length})",
+              style: text.titleMedium,
             ),
-            if (i != rooms.length - 1) const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Layouts are available for living rooms, bedrooms, kitchens, '
+              'bathrooms and dining areas.',
+              style: text.bodySmall?.copyWith(color: c.textMuted),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            cards(blocked, enabled: false),
           ],
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.md),
           AppButton(
-            label: 'Design the ${room.name}',
+            label: room == null ? 'Choose a room' : 'Design the ${room.name}',
             icon: Icons.auto_awesome_rounded,
-            onPressed: () => _openLayouts(context, room),
+            onPressed: room == null ? null : () => _openLayouts(context, room),
           ),
         ],
       );
@@ -337,8 +462,12 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    'Tap a room on the plan or in the list to see how well it '
-                    'suits an AI redesign.',
+                    rooms == null || rooms.isEmpty
+                        ? 'Tap a room on the plan or in the list to see how '
+                              'well it suits an AI redesign.'
+                        : '$furnishable we can furnish. Tap a room on the plan '
+                              'or in the list to see how well it suits an AI '
+                              'redesign.',
                     style: text.bodyMedium?.copyWith(color: c.textSecondary),
                   ),
                   const SizedBox(height: AppSpacing.xl),
@@ -562,11 +691,27 @@ class _RoomCard extends StatelessWidget {
     required this.room,
     required this.selected,
     required this.onTap,
+    this.enabled = true,
   });
 
   final _DetectedRoom room;
   final bool selected;
   final VoidCallback onTap;
+
+  /// False for a room no layout engine covers yet: shown dimmed and not
+  /// pickable, with no suitability score.
+  final bool enabled;
+
+  /// "97% confidence · size from the plan's printed area", whichever the
+  /// detection recorded.
+  String? get _details {
+    final parts = [
+      if (room.confidence != null)
+        '${(room.confidence! * 100).round()}% confidence',
+      if (room.sizeNote != null) 'size ${room.sizeNote}',
+    ];
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -575,71 +720,89 @@ class _RoomCard extends StatelessWidget {
     final color = room.colorIn(c);
     final status = _scoreStatus(room.suitability);
     final scoreColor = status.colorIn(c);
+    final details = _details;
 
-    return AppCard(
-      onTap: onTap,
-      color: selected ? c.primary.withValues(alpha: 0.08) : null,
-      borderColor: selected ? c.primary.withValues(alpha: 0.55) : null,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color.withValues(alpha: 0.18),
-              border: Border.all(color: color.withValues(alpha: 0.4)),
+    return Opacity(
+      opacity: enabled ? 1 : 0.55,
+      child: AppCard(
+        onTap: enabled ? onTap : null,
+        color: selected ? c.primary.withValues(alpha: 0.08) : null,
+        borderColor: selected ? c.primary.withValues(alpha: 0.55) : null,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color.withValues(alpha: 0.18),
+                border: Border.all(color: color.withValues(alpha: 0.4)),
+              ),
+              child: SizedBox.square(
+                dimension: 48,
+                child: Icon(room.icon, color: color, size: 22),
+              ),
             ),
-            child: SizedBox.square(
-              dimension: 48,
-              child: Icon(room.icon, color: color, size: 22),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: Text(room.name, style: text.titleSmall)),
-                    AppStatusChip(
-                      label: '${room.suitability}% match',
-                      status: status,
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: Text(room.name, style: text.titleSmall)),
+                      if (enabled)
+                        AppStatusChip(
+                          label: '${room.suitability}% match',
+                          status: status,
+                        ),
+                    ],
+                  ),
+                  if (enabled) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      room.tag,
+                      style: text.labelMedium?.copyWith(color: scoreColor),
                     ),
                   ],
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  room.tag,
-                  style: text.labelMedium?.copyWith(color: scoreColor),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  room.note,
-                  style: text.bodySmall?.copyWith(color: c.textMuted),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                ClipRRect(
-                  borderRadius: AppRadius.fullAll,
-                  child: LinearProgressIndicator(
-                    value: room.suitability / 100,
-                    minHeight: 5,
-                    backgroundColor: c.glassFill,
-                    valueColor: AlwaysStoppedAnimation(scoreColor),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    room.note,
+                    style: text.bodySmall?.copyWith(color: c.textMuted),
                   ),
-                ),
-              ],
+                  if (details != null) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      details,
+                      style: text.labelSmall?.copyWith(color: c.textMuted),
+                    ),
+                  ],
+                  if (enabled) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    ClipRRect(
+                      borderRadius: AppRadius.fullAll,
+                      child: LinearProgressIndicator(
+                        value: room.suitability / 100,
+                        minHeight: 5,
+                        backgroundColor: c.glassFill,
+                        valueColor: AlwaysStoppedAnimation(scoreColor),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Icon(
-            selected
-                ? Icons.check_circle_rounded
-                : Icons.radio_button_unchecked_rounded,
-            color: selected ? c.primary : c.border,
-            size: 20,
-          ),
-        ],
+            const SizedBox(width: AppSpacing.sm),
+            Icon(
+              !enabled
+                  ? Icons.block_rounded
+                  : selected
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              color: selected && enabled ? c.primary : c.border,
+              size: 20,
+            ),
+          ],
+        ),
       ),
     );
   }

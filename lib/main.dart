@@ -16,6 +16,7 @@ import 'data/room_export.dart';
 import 'data/site_news.dart';
 import 'data/supabase_service.dart';
 import 'env.dart';
+import 'plan_overlay.dart';
 import 'responsive.dart';
 import 'theme_controller.dart';
 
