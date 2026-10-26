@@ -8,6 +8,7 @@ import 'avatar.dart';
 import 'detector_service.dart';
 import 'layout_service.dart';
 import 'models.dart';
+import 'site_news.dart';
 
 const _uuidGen = Uuid();
 
@@ -729,9 +730,72 @@ class SavedDesignRepository {
   }
 }
 
+/// The totals on the welcome screen. They come from a database function that
+/// anyone, signed in or not, may call: it counts rows and returns nothing
+/// about any one of them.
+class SiteStatsRepository {
+  SiteStatsRepository._();
+  static final SiteStatsRepository instance = SiteStatsRepository._();
+
+  /// The live totals, or null if they can't be read, so the screen shows
+  /// dashes rather than an error.
+  Future<SiteStats?> fetch() async {
+    try {
+      return SiteStats.fromRpc(await supa.rpc('get_site_stats'));
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
 class AdminRepository {
   AdminRepository._();
   static final AdminRepository instance = AdminRepository._();
+
+  /// How many people will get product news: those with the "Product news"
+  /// switch on (the web's `countNewsReaders`).
+  Future<int> countNewsReaders() => supa
+      .from('User')
+      .count()
+      .filter('NotificationPrefs->>updates', 'eq', 'true');
+
+  /// Emails a product-news message to everyone who wants it, or, with
+  /// [testOnly], to the admin's own address alone. Returns how many people it
+  /// went to; throws an [Exception] saying what went wrong, in words from
+  /// [newsProblem].
+  Future<int> sendProductNews({
+    required String subject,
+    required String message,
+    bool testOnly = false,
+  }) async {
+    final Object? body;
+    try {
+      final response = await supa.functions.invoke(
+        'send-notification',
+        body: {
+          'kind': 'news',
+          'params': {
+            'subject': subject,
+            'message': message,
+            'testOnly': testOnly,
+          },
+        },
+      );
+      body = response.data;
+    } on FunctionException catch (e) {
+      final details = e.details;
+      final reason = details is Map
+          ? '${details['reason'] ?? details['error'] ?? ''}'
+          : '';
+      throw Exception(newsProblem(reason));
+    }
+    if (body is Map && body['sent'] == false) {
+      throw Exception(newsProblem('${body['reason'] ?? ''}'));
+    }
+    return body is Map && body['recipients'] is num
+        ? (body['recipients'] as num).toInt()
+        : 0;
+  }
 
   Future<List<AdminUserRecord>> fetchUsers() async {
     final rows = await supa
