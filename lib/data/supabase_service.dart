@@ -8,6 +8,7 @@ import 'avatar.dart';
 import 'detector_service.dart';
 import 'layout_service.dart';
 import 'models.dart';
+import 'project_status.dart';
 import 'site_news.dart';
 
 const _uuidGen = Uuid();
@@ -326,6 +327,28 @@ class FloorPlanRepository {
         .eq('UserID', userId)
         .order('UploadDateTime', ascending: false);
     return rows.map(FloorPlanRecord.fromJson).toList();
+  }
+
+  /// The user's floor plans, newest first, each joined with its analysis row
+  /// to tell how far it has got: the web dashboard's list. The analysis
+  /// query leaves out `LayoutJSON`, which can hold every layout generated.
+  Future<List<ProjectSummary>> fetchProjects(String userId) async {
+    final plans = await fetchUserFloorPlans(userId);
+    final rows = await supa
+        .from('FloorPlanAnalysis')
+        .select(
+          'FloorPlanID, UserID, Status, SelectedRoomID, DetectionJSON, '
+          'SelectedLayoutJSON, CreatedAt, UpdatedAt',
+        )
+        .eq('UserID', userId);
+    final byPlan = {
+      for (final row in rows)
+        row['FloorPlanID'] as String: FloorPlanAnalysisRecord.fromJson(row),
+    };
+    return [
+      for (final plan in plans)
+        ProjectSummary.of(plan, byPlan[plan.floorPlanId]),
+    ];
   }
 
   /// Uploads image bytes to the private `floorplans` bucket under the

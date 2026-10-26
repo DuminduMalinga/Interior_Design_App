@@ -89,17 +89,23 @@ class _TabScaffold extends StatelessWidget {
 /// object resolved, a short-lived signed URL to its image.
 class _ProjectView {
   const _ProjectView({
-    required this.record,
+    required this.summary,
     required this.accent,
     this.imageUrl,
   });
 
-  final FloorPlanRecord record;
+  /// The plan and how far it has got through the design flow.
+  final ProjectSummary summary;
   final Color accent;
   final String? imageUrl;
 
-  String get title => record.displayTitle;
-  String get dateLabel => _formatRelativeDate(record.uploadDateTime);
+  FloorPlanRecord get record => summary.plan;
+
+  /// The room it was taken to, else how many rooms it has (the web's title).
+  String get title => summary.title;
+
+  /// When it last changed: its analysis, else its upload.
+  String get dateLabel => _formatRelativeDate(summary.updatedAt);
 }
 
 String _formatRelativeDate(DateTime dateTime) {
@@ -138,23 +144,23 @@ String _formatRelativeDate(DateTime dateTime) {
 Future<List<_ProjectView>> _loadUserProjects(AppColors c) async {
   final user = AuthService.instance.currentUser;
   if (user == null) return const [];
-  final records = await FloorPlanRepository.instance.fetchUserFloorPlans(
-    user.id,
-  );
+  final summaries = await FloorPlanRepository.instance.fetchProjects(user.id);
   final accents = [c.primary, c.accent, c.secondary, c.warning];
   final urls = await Future.wait(
-    records.map((r) async {
+    summaries.map((p) async {
       try {
-        return await FloorPlanRepository.instance.signedUrlFor(r.imagePath);
+        return await FloorPlanRepository.instance.signedUrlFor(
+          p.plan.imagePath,
+        );
       } catch (_) {
         return null;
       }
     }),
   );
   return [
-    for (final (i, record) in records.indexed)
+    for (final (i, summary) in summaries.indexed)
       _ProjectView(
-        record: record,
+        summary: summary,
         accent: accents[i % accents.length],
         imageUrl: urls[i],
       ),
@@ -329,6 +335,12 @@ class _DashboardContent extends StatelessWidget {
               )
             else
               hero,
+            if (projects != null && projects!.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.xl),
+              ProjectStatsRow(
+                stats: ProjectStats.of([for (final p in projects!) p.summary]),
+              ),
+            ],
             const SizedBox(height: AppSpacing.xxl),
             AppSectionHeader(
               title: 'Recent Projects',
@@ -649,9 +661,9 @@ class _ProjectGrid extends StatelessWidget {
       tabletColumns: 3,
       desktopColumns: 4,
       childAspectRatio: context.responsive(
-        mobile: 0.88,
-        tablet: 1.0,
-        desktop: 1.1,
+        mobile: 0.74,
+        tablet: 0.95,
+        desktop: 1.05,
       ),
       children: [
         for (final (index, project) in list.indexed)
@@ -716,6 +728,19 @@ class _ProjectCard extends StatelessWidget {
     final c = context.colors;
     final text = context.text;
     final imageUrl = project.imageUrl;
+    final summary = project.summary;
+    final score = summary.score;
+
+    Widget sketch() => ColoredBox(
+      color: c.surfaceElevated,
+      child: CustomPaint(
+        painter: _PlanPainter(
+          accent: project.accent,
+          lineColor: c.textPrimary,
+          variant: planIndex,
+        ),
+      ),
+    );
 
     return AppCard(
       padding: EdgeInsets.zero,
@@ -729,28 +754,10 @@ class _ProjectCard extends StatelessWidget {
               Image.network(
                 imageUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => ColoredBox(
-                  color: c.surfaceElevated,
-                  child: CustomPaint(
-                    painter: _PlanPainter(
-                      accent: project.accent,
-                      lineColor: c.textPrimary,
-                      variant: planIndex,
-                    ),
-                  ),
-                ),
+                errorBuilder: (context, error, stackTrace) => sketch(),
               )
             else
-              ColoredBox(
-                color: c.surfaceElevated,
-                child: CustomPaint(
-                  painter: _PlanPainter(
-                    accent: project.accent,
-                    lineColor: c.textPrimary,
-                    variant: planIndex,
-                  ),
-                ),
-              ),
+              sketch(),
             DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -759,6 +766,15 @@ class _ProjectCard extends StatelessWidget {
                   colors: [Colors.transparent, c.scrim],
                   stops: const [0.4, 1],
                 ),
+              ),
+            ),
+            Positioned(
+              top: AppSpacing.sm,
+              left: AppSpacing.sm,
+              right: AppSpacing.sm,
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: ProjectStageChip(stage: summary.stage),
               ),
             ),
             Positioned(
@@ -781,10 +797,33 @@ class _ProjectCard extends StatelessWidget {
                         children: [
                           Text(
                             project.title,
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: text.titleSmall,
                           ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  summary.stage.nextStep,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: text.labelSmall?.copyWith(
+                                    color: c.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 12,
+                                color: c.primary,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
                           Row(
                             children: [
                               Icon(
@@ -808,11 +847,26 @@ class _ProjectCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Icon(
-                      Icons.more_horiz_rounded,
-                      size: 20,
-                      color: c.textSecondary,
-                    ),
+                    if (score != null) ...[
+                      const SizedBox(width: AppSpacing.sm),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '$score',
+                            style: text.titleMedium?.copyWith(
+                              color: _scoreStatus(score).colorIn(c),
+                            ),
+                          ),
+                          Text(
+                            '/100',
+                            style: text.labelSmall?.copyWith(
+                              color: c.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -937,3 +991,20 @@ class _PlanPainter extends CustomPainter {
       oldDelegate.lineColor != lineColor ||
       oldDelegate.variant != variant;
 }
+
+/// One project card for [summary], so tests can see it without the screens
+/// that load projects from the database.
+@visibleForTesting
+Widget projectCardForTest(
+  ProjectSummary summary, {
+  VoidCallback? onTap,
+  String? imageUrl,
+}) => _ProjectCard(
+  project: _ProjectView(
+    summary: summary,
+    accent: Colors.indigo,
+    imageUrl: imageUrl,
+  ),
+  planIndex: 0,
+  onTap: onTap ?? () {},
+);
