@@ -617,6 +617,53 @@ class SavedDesignRepository {
       'UpdatedAt': DateTime.now().toUtc().toIso8601String(),
     }, onConflict: 'FloorPlanID,RoomID,LayoutType');
   }
+
+  static const _bucket = 'designs';
+  static const _previewLinkSeconds = 60 * 60;
+
+  /// The user's saved designs, newest first, as the web's
+  /// `listSavedDesigns` returns them: preview pictures get a short-lived
+  /// link, since the bucket is private.
+  Future<List<SavedDesignRecord>> list(String userId) async {
+    final rows = await supa
+        .from('SavedDesign')
+        .select(
+          'DesignID, FloorPlanID, RoomID, RoomName, Title, Score, '
+          'LayoutJSON, ModelPath, PreviewPath, UpdatedAt',
+        )
+        .eq('UserID', userId)
+        .order('UpdatedAt', ascending: false);
+
+    final paths = [
+      for (final row in rows)
+        if (row['PreviewPath'] case final String path) path,
+    ];
+    final links = <String, String>{};
+    if (paths.isNotEmpty) {
+      try {
+        final signed = await supa.storage
+            .from(_bucket)
+            .createSignedUrlsResult(paths, _previewLinkSeconds);
+        for (final s in signed.whereType<SignedUrlSuccess>()) {
+          links[s.path] = s.signedUrl;
+        }
+      } catch (_) {
+        // a design without its picture still lists
+      }
+    }
+
+    return [
+      for (final row in rows)
+        SavedDesignRecord.fromJson(row, previewUrl: links[row['PreviewPath']]),
+    ];
+  }
+
+  /// Removes a saved design and its files, as the web's `deleteSavedDesign`.
+  Future<void> delete(SavedDesignRecord design) async {
+    final files = design.storagePaths;
+    if (files.isNotEmpty) await supa.storage.from(_bucket).remove(files);
+    await supa.from('SavedDesign').delete().eq('DesignID', design.designId);
+  }
 }
 
 class AdminRepository {

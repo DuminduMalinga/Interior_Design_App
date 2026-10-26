@@ -3,11 +3,12 @@ part of 'main.dart';
 const _navItems = [
   (Icons.home_rounded, 'Home'),
   (Icons.grid_view_rounded, 'Projects'),
+  (Icons.bookmarks_outlined, 'Designs'),
   (Icons.cloud_upload_outlined, 'Upload'),
   (Icons.person_outline_rounded, 'Profile'),
 ];
 
-/// Switches to one of the four tab screens.
+/// Switches to one of the five tab screens.
 ///
 /// Uses [Navigator.pushReplacement] rather than [Navigator.push]: pushing
 /// would stack the new tab's screen on top of the old one, and since only
@@ -18,8 +19,9 @@ const _navItems = [
 void _switchTab(BuildContext context, int index) {
   final screen = switch (index) {
     1 => const ProjectsScreen(),
-    2 => const UploadScreen(),
-    3 => const ProfileScreen(),
+    2 => const DesignsScreen(),
+    3 => const UploadScreen(),
+    4 => const ProfileScreen(),
     _ => const DashboardScreen(),
   };
   Navigator.of(
@@ -27,7 +29,7 @@ void _switchTab(BuildContext context, int index) {
   ).pushReplacement(MaterialPageRoute<void>(builder: (_) => screen));
 }
 
-/// Shared chrome for the four tab screens: a bottom nav on mobile or a side
+/// Shared chrome for the five tab screens: a bottom nav on mobile or a side
 /// rail on wider screens. Every tab screen renders through this so the nav
 /// stays visually identical — and present — no matter which tab is active.
 class _TabScaffold extends StatelessWidget {
@@ -245,7 +247,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       selectedIndex: 0,
       floatingActionButton: FloatingActionButton(
         heroTag: 'new-upload',
-        onPressed: () => _switchTab(context, 2),
+        onPressed: () => _switchTab(context, 3),
         tooltip: 'New upload',
         child: const Icon(Icons.add_rounded, size: 28),
       ),
@@ -257,8 +259,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           isAdmin: _isAdmin,
           projects: _projects,
           onSeeAll: () => _switchTab(context, 1),
-          onUpload: () => _switchTab(context, 2),
-          onAvatarTap: () => _switchTab(context, 3),
+          onUpload: () => _switchTab(context, 3),
+          onAvatarTap: () => _switchTab(context, 4),
           onProjectTap: (p) => _openProject(context, p.record),
           onAdminTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(

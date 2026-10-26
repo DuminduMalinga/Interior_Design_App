@@ -761,3 +761,70 @@ class AnalysisLayoutSet {
   final String? bestType;
   final List<AnalysisLayout> layouts;
 }
+
+/// A `SavedDesign` row: one room of a floor plan furnished with one layout,
+/// saved from the layouts screen here or the 3D view on the web.
+class SavedDesignRecord {
+  const SavedDesignRecord({
+    required this.designId,
+    required this.floorPlanId,
+    required this.roomId,
+    required this.roomName,
+    required this.title,
+    required this.score,
+    required this.layout,
+    required this.modelPath,
+    required this.previewPath,
+    required this.updatedAt,
+    this.previewUrl,
+  });
+
+  /// [previewUrl] is a short-lived link to [previewPath], since the
+  /// `designs` bucket is private.
+  factory SavedDesignRecord.fromJson(
+    Map<String, dynamic> json, {
+    String? previewUrl,
+  }) {
+    final layoutJson = json['LayoutJSON'];
+    final score = json['Score'];
+    final scoreValue = score is num ? score : num.tryParse('${score ?? ''}');
+    return SavedDesignRecord(
+      designId: json['DesignID'] as String,
+      floorPlanId: json['FloorPlanID'] as String,
+      roomId: json['RoomID'] as String,
+      roomName: json['RoomName'] as String? ?? 'Room',
+      title: json['Title'] as String?,
+      score: scoreValue?.round(),
+      layout: layoutJson is Map
+          ? AnalysisLayout.fromJson(Map<String, dynamic>.from(layoutJson))
+          : null,
+      modelPath: json['ModelPath'] as String?,
+      previewPath: json['PreviewPath'] as String?,
+      updatedAt: DateTime.parse(json['UpdatedAt'] as String),
+      previewUrl: previewUrl,
+    );
+  }
+
+  final String designId;
+  final String floorPlanId;
+  final String roomId;
+  final String roomName;
+  final String? title;
+
+  /// 0-100, or null when the row has none.
+  final int? score;
+
+  /// The engine layout, enough to redraw the plan and the 3D room; null when
+  /// `LayoutJSON` is unreadable.
+  final AnalysisLayout? layout;
+
+  /// The exported 3D model (.glb) and preview picture (.png) in the
+  /// `designs` bucket; the web saves them, the app does not yet.
+  final String? modelPath;
+  final String? previewPath;
+  final DateTime updatedAt;
+  final String? previewUrl;
+
+  /// The files to remove from the `designs` bucket along with the row.
+  List<String> get storagePaths => [?modelPath, ?previewPath];
+}
