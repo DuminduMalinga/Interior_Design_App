@@ -91,6 +91,7 @@ services, and a shareable 3D-style room experience.
 ### 👤 Personal experience
 
 - Email or username authentication
+- Sign-up checks as you type: whether the username is free (after a short pause) and how strong the password is
 - Forgot-password and reset-password flows
 - Profile photo, usage statistics, and notification preferences
 - Persistent light and dark themes
@@ -112,7 +113,7 @@ services, and a shareable 3D-style room experience.
 
 ### 🔐 Administration
 
-- Search and manage customer accounts
+- Search and manage customer accounts, filter them by role (with counts), sort them by name, email, role or last activity, and see each account's profile picture
 - Protected administrator accounts
 - Administrative activity log
 - Product news and test-send support
