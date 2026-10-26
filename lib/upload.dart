@@ -48,7 +48,7 @@ class _UploadScreenState extends State<UploadScreen> {
     );
 
     return _TabScaffold(
-      selectedIndex: 2,
+      selectedIndex: 3,
       appBar: AppBar(title: const Text('Upload floor plan')),
       body: SingleChildScrollView(
         child: AppContentFrame(

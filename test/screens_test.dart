@@ -102,6 +102,15 @@ void main() {
         expect(find.text('Upload your floor plan'), findsOneWidget);
       });
 
+      testWidgets('designs: empty when nobody is signed in', (tester) async {
+        await pumpScreen(tester, const DesignsScreen(), size);
+        await tester.pump();
+        expect(find.text('No saved designs yet'), findsOneWidget);
+        expect(find.text('0 saved designs'), findsOneWidget);
+        // the tab is in the nav (bottom bar on mobile, side rail otherwise)
+        expect(find.text('Designs'), findsOneWidget);
+      });
+
       // The following screens now load their content from Supabase
       // (floor plans, rooms, layouts, accounts, profile) and require a
       // signed-in session and seeded data to render anything beyond a

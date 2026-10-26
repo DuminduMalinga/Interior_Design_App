@@ -222,7 +222,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     return _TabScaffold(
-      selectedIndex: 3,
+      selectedIndex: 4,
       appBar: AppBar(title: const Text('Profile')),
       body: RefreshIndicator(
         onRefresh: _load,
