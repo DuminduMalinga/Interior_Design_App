@@ -41,6 +41,8 @@ A few things worth knowing before you dig into the code:
 - A 3D room viewer: drag to orbit, pinch or button to zoom
 - Light and dark themes: Profile → Appearance switches between them at once and remembers the choice on the device (dark by default, as on the web)
 - Profile → Help & support (answers to common questions, written from what the app does) and About LiviSpace (how it works, the six rooms it furnishes, the version)
+- Live totals on the welcome screen (registered users, layouts generated, floor plans uploaded), read from the `get_site_stats` database function like the web landing page; they show a dash until loaded or if the lookup fails
+- Admins can email **product news** from Manage accounts (the mail icon): a subject and message go to everyone with the Product news switch on, or to the admin alone with "Send me a test", through the `send-notification` edge function; email must be configured there (`RESEND_API_KEY`)
 - Profile screen (stats, settings, sign out) and admin account moderation (search, filter, approve/reject)
 - Dark, responsive UI built from a shared theme and component library
 

@@ -3,7 +3,11 @@ part of 'main.dart';
 /// The app's landing screen — first thing a new user sees before signing up
 /// or jumping into the dashboard.
 class WelcomeScreen extends StatefulWidget {
-  const WelcomeScreen({super.key});
+  const WelcomeScreen({super.key, this.loadStats});
+
+  /// Where the live totals come from; the database unless a test says
+  /// otherwise.
+  final Future<SiteStats?> Function()? loadStats;
 
   @override
   State<WelcomeScreen> createState() => _WelcomeScreenState();
@@ -50,27 +54,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       },
       child: const _HeroCard(),
     );
-    const stats = Row(
-      children: [
-        Expanded(
-          child: _StatTile(
-            icon: Icons.check_circle_outline_rounded,
-            value: '98%',
-            label: 'Boundary Accuracy',
-            accent: _StatAccent.primary,
-          ),
-        ),
-        SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: _StatTile(
-            icon: Icons.bolt_rounded,
-            value: '15s',
-            label: 'AI 3D Synthesis',
-            accent: _StatAccent.secondary,
-          ),
-        ),
-      ],
-    );
+    final stats = _WelcomeStats(load: widget.loadStats);
     final note = Text(
       'No credit card required • Instant 3D CAD analysis',
       textAlign: wide ? TextAlign.start : TextAlign.center,
@@ -264,6 +248,84 @@ class _Headline extends StatelessWidget {
   }
 }
 
+/// The four totals under the headline, as on the web's landing page. The
+/// counts are live; until they load, or if they can't, they show a dash.
+class _WelcomeStats extends StatefulWidget {
+  const _WelcomeStats({this.load});
+
+  final Future<SiteStats?> Function()? load;
+
+  @override
+  State<_WelcomeStats> createState() => _WelcomeStatsState();
+}
+
+class _WelcomeStatsState extends State<_WelcomeStats> {
+  SiteStats? _stats;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    SiteStats? stats;
+    try {
+      stats = await (widget.load ?? SiteStatsRepository.instance.fetch)();
+    } catch (_) {
+      stats = null;
+    }
+    if (!mounted || stats == null) return;
+    setState(() => _stats = stats);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stats = _stats;
+    Widget pair(_StatTile a, _StatTile b) => Row(
+      children: [
+        Expanded(child: a),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(child: b),
+      ],
+    );
+
+    return Column(
+      children: [
+        pair(
+          _StatTile(
+            icon: Icons.group_outlined,
+            value: formatCount(stats?.users),
+            label: 'Registered users',
+            accent: _StatAccent.primary,
+          ),
+          const _StatTile(
+            icon: Icons.bolt_rounded,
+            value: '< 2 min',
+            label: 'Processing time',
+            accent: _StatAccent.secondary,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        pair(
+          _StatTile(
+            icon: Icons.view_in_ar_rounded,
+            value: formatCount(stats?.layouts),
+            label: 'Layouts generated',
+            accent: _StatAccent.secondary,
+          ),
+          _StatTile(
+            icon: Icons.cloud_upload_outlined,
+            value: formatCount(stats?.floorPlans),
+            label: 'Floor plans uploaded',
+            accent: _StatAccent.primary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 enum _StatAccent {
   primary,
   secondary;
@@ -315,7 +377,7 @@ class _StatTile extends StatelessWidget {
                 Text(value, style: text.titleMedium),
                 Text(
                   label,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: text.labelSmall?.copyWith(color: c.textMuted),
                 ),
