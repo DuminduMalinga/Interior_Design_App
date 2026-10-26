@@ -24,7 +24,7 @@ A few things worth knowing before you dig into the code:
 5. A processing screen waits for the backend analysis to finish.
 6. They review the rooms the AI claims to have detected and pick one.
 7. They compare AI-generated layout options for that room, ranked by match score.
-8. They can view a chosen layout as a rotatable, zoomable 3D room.
+8. They can view a chosen layout as a rotatable, zoomable 3D room. Export saves the view as a PNG and Share sends it through the system share sheet (the web can also export the 3D model; the app draws the room itself, so there is none).
 9. Admins can review pending sign-ups and approve or reject them from a dedicated screen.
 
 ## Features
