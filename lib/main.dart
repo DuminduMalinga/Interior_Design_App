@@ -28,6 +28,7 @@ part 'auth.dart';
 part 'forgot_password.dart';
 part 'welcome.dart';
 part 'profile.dart';
+part 'about.dart';
 part 'room_viewer.dart';
 part 'room_pieces.dart';
 part 'room_pieces_living.dart';
