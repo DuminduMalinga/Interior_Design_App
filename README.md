@@ -81,9 +81,9 @@ services, and a shareable 3D-style room experience.
 - Browse projects with search and refresh; each card says where the plan is in the flow (Uploaded, Rooms detected, Layouts ready, Layout chosen), what to do next, and the chosen layout's score
 - See your totals on Home: floor plans uploaded, finished plans, and the last layout score
 - Revisit saved designs from the app or web
-- Orbit and zoom around an interactive room view, and reset it to the opening view
+- Turn an interactive room view all the way round (walls, doors and windows follow the camera), zoom in, and reset it to the opening view
 - See a layout's score, whether it is valid, the room's size and every piece in it; pick a piece to see its size, how it was placed and why, and find it outlined in the room (a panel over the room on a phone, beside it on a wider screen)
-- Export designs as PNG or share them from your device
+- Export or share a room as a picture (PNG) or as a real-size 3D model (`.glb`, in metres, every piece a named object) that opens in Blender, AR viewers and other 3D tools
 
 </td>
 <td width="50%" valign="top">

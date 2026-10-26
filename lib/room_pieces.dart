@@ -348,6 +348,7 @@ List<_Solid> _buildFurniture(
   required double roomD,
   double roomW = 0,
   double roomL = 0,
+  List<int>? owners,
 }) {
   final solids = <_Solid>[];
   // a lamp on a table or desk stands on the tallest piece under its centre
@@ -395,6 +396,8 @@ List<_Solid> _buildFurniture(
       builder(p);
     }
     solids.addAll(p.out);
+    // which piece each solid belongs to, for naming them in a 3D model
+    owners?.addAll(List.filled(p.out.length, i));
   }
   return solids;
 }
