@@ -453,21 +453,10 @@ class _Header extends StatelessWidget {
           child: InkWell(
             onTap: onAvatarTap,
             customBorder: const CircleBorder(),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: c.brandGradient,
-                border: Border.all(color: c.glassBorder, width: 1.5),
-              ),
-              child: SizedBox.square(
-                dimension: 48,
-                child: Center(
-                  child: Text(
-                    profile?.initials ?? '',
-                    style: text.labelLarge?.copyWith(color: c.onPrimary),
-                  ),
-                ),
-              ),
+            child: AppAvatar(
+              initials: profile?.initials ?? '',
+              imageUrl: profile?.avatarUrl,
+              size: 48,
             ),
           ),
         ),

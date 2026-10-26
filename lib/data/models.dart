@@ -58,6 +58,7 @@ class AppUserProfile {
     this.bio,
     this.location,
     this.phone,
+    this.avatarUrl,
     this.lastSignIn,
     this.notifications = const NotificationPrefs(),
   });
@@ -71,6 +72,7 @@ class AppUserProfile {
     bio: json['Bio'] as String?,
     location: json['Location'] as String?,
     phone: json['Phone'] as String?,
+    avatarUrl: json['AvatarUrl'] as String?,
     notifications: NotificationPrefs.fromJson(json['NotificationPrefs']),
     lastSignIn: json['LastSignIn'] == null
         ? null
@@ -85,6 +87,10 @@ class AppUserProfile {
   final String? bio;
   final String? location;
   final String? phone;
+
+  /// Public address of the profile picture in the `avatars` bucket; null
+  /// shows the [initials] instead.
+  final String? avatarUrl;
   final DateTime? lastSignIn;
   final NotificationPrefs notifications;
 
