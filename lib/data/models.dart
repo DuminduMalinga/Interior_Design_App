@@ -6,7 +6,9 @@
 /// camelCase.
 library;
 
-import 'dart:ui' show Rect;
+import 'dart:ui' show Offset, Rect;
+
+import 'plan_geometry.dart';
 
 /// What the user chose to be emailed about (`User.NotificationPrefs`, shared
 /// with the web app).
@@ -189,6 +191,9 @@ class FloorPlanAnalysisRecord {
   bool get isFailed => status.toLowerCase() == 'failed';
 
   List<AnalysisRoom> get rooms => AnalysisRoom.listFrom(detectionJson);
+
+  /// The detection with the plan image's size, counts and size scale.
+  AnalysisPlan get plan => AnalysisPlan.from(detectionJson);
 }
 
 class RoomRecord {
@@ -446,6 +451,11 @@ class AnalysisRoom {
     this.heightM,
     this.areaM2,
     this.bboxFraction,
+    this.polygonFraction,
+    this.areaSource,
+    this.widthPx,
+    this.heightPx,
+    this.areaPx,
   });
 
   factory AnalysisRoom.fromJson(Map<String, dynamic> json) {
@@ -472,6 +482,11 @@ class AnalysisRoom {
       heightM: _asDouble(json['heightM']),
       areaM2: _asDouble(json['areaM2']),
       bboxFraction: bounds,
+      polygonFraction: _pctPoints(json['polygonPct']),
+      areaSource: json['areaSource'] as String?,
+      widthPx: _asDouble(json['widthPx']),
+      heightPx: _asDouble(json['heightPx']),
+      areaPx: _asDouble(json['areaPx']),
     );
   }
 
@@ -497,8 +512,177 @@ class AnalysisRoom {
   /// Position within the plan image as fractions (0-1) of its size.
   final Rect? bboxFraction;
 
+  /// The room's own outline, traced from the walls, as fractions (0-1) of the
+  /// plan image; null on detections saved before outlines were traced.
+  final List<Offset>? polygonFraction;
+
+  /// Where the size came from: "ocr" (printed on the plan), "estimated"
+  /// (from the plan's scale), or null when there is no size.
+  final String? areaSource;
+  final double? widthPx;
+  final double? heightPx;
+  final double? areaPx;
+
+  /// Where the room is on the plan: its outline, else its box's corners.
+  /// Null when the detection recorded no position at all.
+  List<Offset>? get outline =>
+      polygonFraction ??
+      (bboxFraction == null ? null : rectCorners(bboxFraction!));
+
   bool get isLivingRoom =>
       RegExp('living', caseSensitive: false).hasMatch(name);
+}
+
+/// Reads `[[x, y], …]` in percent into fractions; null unless it is a real
+/// outline (three or more points).
+List<Offset>? _pctPoints(Object? value) {
+  if (value is! List) return null;
+  final points = <Offset>[];
+  for (final p in value) {
+    if (p is! List || p.length < 2) return null;
+    final x = _asDouble(p[0]);
+    final y = _asDouble(p[1]);
+    if (x == null || y == null) return null;
+    points.add(Offset(x / 100, y / 100));
+  }
+  return points.length >= 3 ? points : null;
+}
+
+/// A room's size in metres and where it came from, as the web's room list
+/// shows it.
+class RoomSize {
+  const RoomSize({
+    required this.widthM,
+    required this.heightM,
+    required this.areaM2,
+    required this.source,
+  });
+
+  final double widthM;
+  final double heightM;
+  final double areaM2;
+
+  /// "ocr", "estimated", "door" or "default"; null when not recorded.
+  final String? source;
+
+  /// "4.20 × 3.10 m", as the web writes it.
+  String get dims =>
+      '${widthM.toStringAsFixed(2)} × ${heightM.toStringAsFixed(2)} m';
+
+  String get area => '${areaM2.toStringAsFixed(1)} m²';
+
+  /// How trustworthy the size is: the web's `SIZE_NOTES`.
+  String? get note => switch (source) {
+    'ocr' => "from the plan's printed area",
+    'estimated' => "estimated from the plan's scale",
+    'door' => 'estimated from the doors, taking a standard 900 mm door',
+    'default' => 'a rough estimate: the plan has no scale and no doors',
+    _ => null,
+  };
+}
+
+/// The whole of a `DetectionJSON` document the room-selection screen needs:
+/// its rooms, the plan image's size and the counts of what was found.
+class AnalysisPlan {
+  const AnalysisPlan({
+    required this.rooms,
+    required this.imageWidth,
+    required this.imageHeight,
+    required this.counts,
+    required this.mmPerPx,
+    required this.scaleSource,
+  });
+
+  /// An empty plan for anything that is not a detection document.
+  static const empty = AnalysisPlan(
+    rooms: [],
+    imageWidth: 0,
+    imageHeight: 0,
+    counts: {},
+    mmPerPx: _defaultMmPerPx,
+    scaleSource: 'default',
+  );
+
+  factory AnalysisPlan.from(Object? detectionJson) {
+    if (detectionJson is! Map) return empty;
+    final counts = <String, int>{};
+    final rawCounts = detectionJson['counts'];
+    if (rawCounts is Map) {
+      rawCounts.forEach((k, v) {
+        if (v is num) counts['$k'] = v.toInt();
+      });
+    }
+
+    // What the layout engines assume for a plan with no printed areas: a
+    // standard door leaf over the median detected door, else a flat default.
+    final spans = <double>[];
+    final detections = detectionJson['detections'];
+    if (detections is List) {
+      for (final d in detections) {
+        if (d is! Map || d['class'] != 'Door' || d['bbox'] is! Map) continue;
+        final b = d['bbox'] as Map;
+        final x1 = _asDouble(b['x1']), y1 = _asDouble(b['y1']);
+        final x2 = _asDouble(b['x2']), y2 = _asDouble(b['y2']);
+        if (x1 == null || y1 == null || x2 == null || y2 == null) continue;
+        final span = (x2 - x1) > (y2 - y1) ? x2 - x1 : y2 - y1;
+        if (span > 0) spans.add(span);
+      }
+    }
+    spans.sort();
+
+    return AnalysisPlan(
+      rooms: AnalysisRoom.listFrom(detectionJson),
+      imageWidth: _asDouble(detectionJson['imageWidth']) ?? 0,
+      imageHeight: _asDouble(detectionJson['imageHeight']) ?? 0,
+      counts: counts,
+      mmPerPx: spans.isEmpty
+          ? _defaultMmPerPx
+          : _standardDoorWidthMm / spans[spans.length ~/ 2],
+      scaleSource: spans.isEmpty ? 'default' : 'door',
+    );
+  }
+
+  static const _standardDoorWidthMm = 900.0;
+  static const _defaultMmPerPx = 20.0;
+
+  final List<AnalysisRoom> rooms;
+  final double imageWidth;
+  final double imageHeight;
+
+  /// What the detector found, by kind: Wall, Room, Door, Window.
+  final Map<String, int> counts;
+
+  /// Millimetres per pixel assumed for rooms with no printed size, and what
+  /// that assumption rests on ("door" or "default").
+  final double mmPerPx;
+  final String scaleSource;
+
+  /// Width over height of the plan image; 4:3 when it is not known.
+  double get aspectRatio =>
+      imageWidth > 0 && imageHeight > 0 ? imageWidth / imageHeight : 4 / 3;
+
+  /// The room's size: the printed one when the plan has it, else an estimate
+  /// from the plan's scale; null when the detection holds neither.
+  RoomSize? sizeOf(AnalysisRoom room) {
+    final w = room.widthM, h = room.heightM, a = room.areaM2;
+    if (w != null && h != null && a != null) {
+      return RoomSize(
+        widthM: w,
+        heightM: h,
+        areaM2: a,
+        source: room.areaSource,
+      );
+    }
+    final wp = room.widthPx, hp = room.heightPx, ap = room.areaPx;
+    if (wp == null || hp == null || ap == null) return null;
+    final mPerPx = mmPerPx / 1000;
+    return RoomSize(
+      widthM: wp * mPerPx,
+      heightM: hp * mPerPx,
+      areaM2: ap * mPerPx * mPerPx,
+      source: scaleSource,
+    );
+  }
 }
 
 class AnalysisFurniture {

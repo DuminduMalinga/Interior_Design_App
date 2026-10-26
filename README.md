@@ -57,6 +57,8 @@ services, and a shareable 3D-style room experience.
 - Upload JPG, JPEG, or PNG plans up to 10 MB
 - Detect rooms, walls, doors, and windows
 - Estimate room dimensions and floor area
+- See your uploaded plan with each detected room outlined on it, tap a room on the plan or in the list, and see where its size came from and how sure the detector is
+- See rooms that can't be furnished yet listed apart, so it is clear what you can pick
 - See suitability scores for detected rooms
 
 </td>
@@ -161,6 +163,7 @@ flowchart LR
 | Shared components | [`lib/app_components.dart`](lib/app_components.dart) | Buttons, cards, inputs, logos, and reusable UI |
 | Responsive layout | [`lib/responsive.dart`](lib/responsive.dart) | Mobile, tablet, and desktop breakpoints |
 | Feature screens | [`lib/`](lib/) | Authentication, dashboard, projects, upload, layouts, profile, and admin |
+| Plan overlay | [`lib/plan_overlay.dart`](lib/plan_overlay.dart) | The uploaded plan with tappable room outlines drawn over it |
 | Data layer | [`lib/data/`](lib/data/) | Models, repositories, layout services, exports, and Supabase access |
 | Backend schema | [`supabase/migrations/`](supabase/migrations/) | Database tables, functions, and policies |
 | Edge functions | [`supabase/functions/`](supabase/functions/) | Notifications, account deletion, and username login |
