@@ -57,6 +57,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
+  /// Lets the user switch between the dark and light look; it applies at
+  /// once and is remembered on this device.
+  Future<void> _chooseAppearance() async {
+    final current = ThemeController.instance.value;
+    final choice = await showModalBottomSheet<ThemeMode>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final (mode, label, icon) in const [
+              (ThemeMode.dark, 'Dark', Icons.dark_mode_outlined),
+              (ThemeMode.light, 'Light', Icons.light_mode_outlined),
+            ])
+              ListTile(
+                leading: Icon(icon),
+                title: Text(label),
+                trailing: mode == current
+                    ? const Icon(Icons.check_rounded)
+                    : null,
+                onTap: () => Navigator.of(context).pop(mode),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || choice == current) return;
+    await ThemeController.instance.set(choice);
+    if (mounted) setState(() {});
+  }
+
   /// Lets the user choose a new picture or remove the current one.
   Future<void> _editAvatar() async {
     final hasPicture = _profile?.avatarUrl != null;
@@ -244,7 +275,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _SettingsTile(
               icon: Icons.campaign_outlined,
               title: 'Product news',
-              subtitle: 'Updates from the InteriorAI team',
+              subtitle: 'Updates from the LiviSpace team',
               trailing: Switch(
                 value: _prefs.updates,
                 activeThumbColor: c.primary,
@@ -252,10 +283,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             _SettingsTile(
-              icon: Icons.dark_mode_outlined,
+              icon: ThemeController.instance.value == ThemeMode.light
+                  ? Icons.light_mode_outlined
+                  : Icons.dark_mode_outlined,
               title: 'Appearance',
-              subtitle: 'Dark',
-              onTap: () => _notify(context, 'Appearance'),
+              subtitle: ThemeController.instance.value == ThemeMode.light
+                  ? 'Light'
+                  : 'Dark',
+              onTap: _chooseAppearance,
             ),
           ],
         ),
@@ -284,13 +319,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _SettingsTile(
               icon: Icons.help_outline_rounded,
               title: 'Help & support',
-              onTap: () => _notify(context, 'Help & support'),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const HelpScreen()),
+              ),
             ),
             _SettingsTile(
               icon: Icons.info_outline_rounded,
               title: 'About LiviSpace',
-              subtitle: 'Version 1.0.0',
-              onTap: () => _notify(context, 'About'),
+              subtitle: 'Version $appVersion',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const AboutScreen()),
+              ),
             ),
           ],
         ),
@@ -363,12 +402,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
-  }
-
-  void _notify(BuildContext context, String feature) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$feature coming soon.')));
   }
 
   Future<void> _editProfile(
