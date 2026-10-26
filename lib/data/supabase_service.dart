@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../env.dart';
+import 'avatar.dart';
 import 'detector_service.dart';
 import 'layout_service.dart';
 import 'models.dart';
@@ -584,6 +585,68 @@ extension GeneratedLayoutPersistence on FloorPlanRepository {
         })
         .eq('FloorPlanID', floorPlanId)
         .eq('UserID', userId);
+  }
+}
+
+/// The profile picture: the image lives in the public `avatars` bucket under
+/// `<user id>/`, and the `User` row keeps its public address (`AvatarUrl`).
+/// Mirrors the web's `avatar.ts`.
+class AvatarRepository {
+  AvatarRepository._();
+  static final AvatarRepository instance = AvatarRepository._();
+
+  static const _bucket = 'avatars';
+
+  /// Stores a new profile picture, records its address on the user's row and
+  /// returns it. [bytes] should already be scaled down ([shrinkAvatar]).
+  Future<String> upload({
+    required String userId,
+    required Uint8List bytes,
+    required String contentType,
+  }) async {
+    // A new name every time, so a stale cached picture is never shown.
+    final path =
+        '$userId/avatar-${DateTime.now().millisecondsSinceEpoch}.'
+        '${avatarExtension(contentType)}';
+    final storage = supa.storage.from(_bucket);
+    await storage.uploadBinary(
+      path,
+      bytes,
+      fileOptions: FileOptions(
+        contentType: contentType,
+        cacheControl: '31536000',
+      ),
+    );
+
+    final url = storage.getPublicUrl(path);
+    try {
+      await supa.from('User').update({'AvatarUrl': url}).eq('UserID', userId);
+    } catch (_) {
+      await storage.remove([path]);
+      rethrow;
+    }
+    await _removeOldPictures(userId, keep: path);
+    return url;
+  }
+
+  /// Removes the picture, going back to the user's initials.
+  Future<void> remove(String userId) async {
+    await supa.from('User').update({'AvatarUrl': null}).eq('UserID', userId);
+    await _removeOldPictures(userId);
+  }
+
+  /// Deletes every picture of the user's except [keep]. Leftover files are
+  /// harmless, so a failure here is not worth failing the change over.
+  Future<void> _removeOldPictures(String userId, {String? keep}) async {
+    try {
+      final storage = supa.storage.from(_bucket);
+      final files = await storage.list(path: userId);
+      final stale = [
+        for (final f in files)
+          if ('$userId/${f.name}' != keep) '$userId/${f.name}',
+      ];
+      if (stale.isNotEmpty) await storage.remove(stale);
+    } catch (_) {}
   }
 }
 
