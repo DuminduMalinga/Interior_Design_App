@@ -136,6 +136,13 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
           icon: const Icon(Icons.arrow_back_rounded),
         ),
         title: const Text('Manage accounts'),
+        actions: [
+          IconButton(
+            onPressed: _sendNews,
+            tooltip: 'Send product news',
+            icon: const Icon(Icons.mail_outline_rounded),
+          ),
+        ],
       ),
       body: AppBackground(
         child: SafeArea(
@@ -228,6 +235,20 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
     }
   }
 
+  /// Opens the product-news form; when it was sent to everyone, says to how
+  /// many.
+  Future<void> _sendNews() async {
+    final recipients = await showDialog<int>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const ProductNewsDialog(),
+    );
+    if (recipients == null || !mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(newsSentMessage(recipients))));
+  }
+
   Future<void> _deleteUser(AdminUserRecord user) async {
     final ok = await _confirm(
       title: 'Delete account?',
@@ -241,6 +262,185 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
       user.userId,
       () => AdminRepository.instance.deleteAccount(user.userId),
       '${user.displayName} was deleted.',
+    );
+  }
+}
+
+/// The form for emailing product news to everyone who turned on "Product
+/// news", or to the admin alone as a test (the web's `NewsDialog`). Closes
+/// with how many people it was sent to; a test leaves it open.
+class ProductNewsDialog extends StatefulWidget {
+  const ProductNewsDialog({super.key, this.countReaders, this.send});
+
+  /// How many people will get it; the database unless a test says otherwise.
+  final Future<int> Function()? countReaders;
+
+  /// Sends the message and returns how many people got it.
+  final Future<int> Function({
+    required String subject,
+    required String message,
+    required bool testOnly,
+  })?
+  send;
+
+  @override
+  State<ProductNewsDialog> createState() => _ProductNewsDialogState();
+}
+
+class _ProductNewsDialogState extends State<ProductNewsDialog> {
+  final _subject = TextEditingController();
+  final _message = TextEditingController();
+  int? _readers;
+  bool _sending = false;
+  bool _testSent = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _subject.addListener(_changed);
+    _message.addListener(_changed);
+    _countReaders();
+  }
+
+  @override
+  void dispose() {
+    _subject.dispose();
+    _message.dispose();
+    super.dispose();
+  }
+
+  void _changed() => setState(() {});
+
+  Future<void> _countReaders() async {
+    try {
+      final count =
+          await (widget.countReaders ??
+              AdminRepository.instance.countNewsReaders)();
+      if (mounted) setState(() => _readers = count);
+    } catch (_) {
+      // the note simply stays general
+    }
+  }
+
+  bool get _ready =>
+      _subject.text.trim().isNotEmpty && _message.text.trim().isNotEmpty;
+
+  Future<void> _submit({required bool testOnly}) async {
+    if (!_ready || _sending || (!testOnly && _readers == 0)) return;
+    setState(() {
+      _sending = true;
+      _error = null;
+      _testSent = false;
+    });
+    try {
+      final send = widget.send ?? AdminRepository.instance.sendProductNews;
+      final recipients = await send(
+        subject: _subject.text.trim(),
+        message: _message.text.trim(),
+        testOnly: testOnly,
+      );
+      if (!mounted) return;
+      if (testOnly) {
+        setState(() => _testSent = true);
+      } else {
+        Navigator.of(context).pop(recipients);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error is Exception
+            ? error.toString().replaceFirst('Exception: ', '')
+            : 'The message could not be sent.';
+      });
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final text = context.text;
+
+    return PopScope(
+      canPop: !_sending,
+      child: AlertDialog(
+        title: const Text('Send product news'),
+        content: SizedBox(
+          width: 440,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  newsReadersNote(_readers),
+                  style: text.bodySmall?.copyWith(color: c.textSecondary),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                TextField(
+                  controller: _subject,
+                  enabled: !_sending,
+                  maxLength: 150,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(labelText: 'Subject'),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: _message,
+                  enabled: !_sending,
+                  maxLength: 5000,
+                  minLines: 5,
+                  maxLines: 8,
+                  keyboardType: TextInputType.multiline,
+                  decoration: const InputDecoration(
+                    labelText: 'Message',
+                    alignLabelWithHint: true,
+                  ),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    _error!,
+                    style: text.bodySmall?.copyWith(color: c.error),
+                  ),
+                ],
+                if (_testSent) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    'Test sent to your own address. Check your inbox.',
+                    style: text.bodySmall?.copyWith(color: c.success),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _sending ? null : () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: _ready && !_sending
+                ? () => _submit(testOnly: true)
+                : null,
+            child: const Text('Send me a test'),
+          ),
+          FilledButton(
+            onPressed: _ready && !_sending && _readers != 0
+                ? () => _submit(testOnly: false)
+                : null,
+            child: _sending
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Send to everyone'),
+          ),
+        ],
+      ),
     );
   }
 }

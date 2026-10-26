@@ -357,8 +357,8 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Layouts are not available for this room yet. '
-            'Pick the living room to continue.',
+            'Layouts are not available for this room yet. Pick a living '
+            'room, bedroom, kitchen, bathroom or dining area to continue.',
           ),
         ),
       );
