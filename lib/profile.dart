@@ -275,7 +275,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _SettingsTile(
               icon: Icons.campaign_outlined,
               title: 'Product news',
-              subtitle: 'Updates from the InteriorAI team',
+              subtitle: 'Updates from the LiviSpace team',
               trailing: Switch(
                 value: _prefs.updates,
                 activeThumbColor: c.primary,
@@ -319,13 +319,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _SettingsTile(
               icon: Icons.help_outline_rounded,
               title: 'Help & support',
-              onTap: () => _notify(context, 'Help & support'),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const HelpScreen()),
+              ),
             ),
             _SettingsTile(
               icon: Icons.info_outline_rounded,
               title: 'About LiviSpace',
-              subtitle: 'Version 1.0.0',
-              onTap: () => _notify(context, 'About'),
+              subtitle: 'Version $appVersion',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const AboutScreen()),
+              ),
             ),
           ],
         ),
@@ -398,12 +402,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
-  }
-
-  void _notify(BuildContext context, String feature) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$feature coming soon.')));
   }
 
   Future<void> _editProfile(
