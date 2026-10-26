@@ -701,6 +701,11 @@ class AnalysisFurniture {
     this.model,
     this.role,
     this.parts = const [],
+    this.engineLabel,
+    this.placementStrategy,
+    this.reasons = const [],
+    this.widthMm,
+    this.depthMm,
   });
 
   /// `bbox` is `[x0, y0, x1, y1]` in mm.
@@ -738,6 +743,15 @@ class AnalysisFurniture {
             if (part is List && part.length == 4)
               [for (final v in part) _asDouble(v) ?? 0],
       ],
+      engineLabel: (json['label'] as String?)?.trim(),
+      placementStrategy: (json['placement_strategy'] as String?)?.trim(),
+      reasons: [
+        if (json['reasons'] is List)
+          for (final r in json['reasons'] as List)
+            if (r is String && r.trim().isNotEmpty) r.trim(),
+      ],
+      widthMm: _asDouble(json['width']),
+      depthMm: _asDouble(json['depth']),
     );
   }
 
@@ -768,10 +782,38 @@ class AnalysisFurniture {
   final String? role;
   final List<List<double>> parts;
 
+  /// The engine's own name for the piece, when it gave one.
+  final String? engineLabel;
+
+  /// How the engine chose the spot, e.g. `headboard:west_wall`.
+  final String? placementStrategy;
+
+  /// Why the piece stands where it does, one sentence each.
+  final List<String> reasons;
+
+  /// The piece's size in mm as the engine reports it; when it doesn't, the
+  /// span of its box.
+  final double? widthMm;
+  final double? depthMm;
+  double get width => widthMm ?? (x1 - x0).abs();
+  double get depth => depthMm ?? (y1 - y0).abs();
+
   String get label => type
       .split('_')
       .map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1))
       .join(' ');
+
+  /// What to call the piece on screen, as the web's `itemLabel`: its label,
+  /// else its role, else its type, in plain words.
+  String get displayName {
+    final named = [
+      engineLabel,
+      role,
+      type,
+    ].firstWhere((s) => s != null && s.trim().isNotEmpty, orElse: () => type)!;
+    final text = named.replaceAll('_', ' ').trim();
+    return text.isEmpty ? text : text[0].toUpperCase() + text.substring(1);
+  }
 }
 
 class AnalysisOpening {
@@ -808,6 +850,7 @@ class AnalysisLayout {
     required this.roomWidth,
     required this.roomLength,
     required this.roomHeight,
+    this.roomAreaM2,
     required this.furniture,
     required this.openings,
     this.cutouts = const [],
@@ -862,6 +905,7 @@ class AnalysisLayout {
       roomWidth: _asDouble(room['width']) ?? 0,
       roomLength: _asDouble(room['length']) ?? 0,
       roomHeight: _asDouble(room['height']) ?? 2800,
+      roomAreaM2: _asDouble(room['area_m2']),
       furniture: [
         if (json['furniture'] is List)
           for (final f in json['furniture'] as List)
@@ -901,6 +945,14 @@ class AnalysisLayout {
   final double roomWidth;
   final double roomLength;
   final double roomHeight;
+
+  /// The room's floor area as the engine measured it (an L-shaped room is
+  /// less than width x length); null if it did not say.
+  final double? roomAreaM2;
+
+  /// The floor area to show: the engine's, else width x length.
+  double get areaM2 => roomAreaM2 ?? (roomWidth * roomLength / 1000000);
+
   final List<AnalysisFurniture> furniture;
   final List<AnalysisOpening> openings;
 
