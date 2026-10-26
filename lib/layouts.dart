@@ -1069,25 +1069,52 @@ class _LayoutRenderPainter extends CustomPainter {
       oldDelegate.variant != variant;
 }
 
+/// Colours plan pieces by role. The type names are every room engine's, as
+/// listed in the web app's `roomPalette3d.ts`; lights, rugs, mirrors and
+/// accessories fall through to the accent.
 Color _furnitureColor(String type, AppColors c) {
   switch (type) {
+    // Seating.
     case 'sofa':
     case 'loveseat':
     case 'l_sofa':
     case 'chair':
     case 'reading_chair':
     case 'desk_chair':
+    case 'dining_chair':
+    case 'stool':
       return c.primary;
+    // Tables and worktops.
     case 'coffee_table':
     case 'side_table':
     case 'desk':
+    case 'dining_table':
+    case 'bedside_table':
+    case 'dressing_table':
+    case 'counter':
+    case 'utensil_drawers':
       return c.warning;
+    // Appliances.
     case 'tv':
     case 'tv_console':
+    case 'stove':
+    case 'fridge':
       return c.error;
+    // Storage.
     case 'bookshelf':
     case 'storage_cabinet':
+    case 'sideboard':
+    case 'dresser':
+    case 'wardrobe':
+    case 'bathroom_cabinet':
       return c.secondary;
+    // Water fixtures.
+    case 'sink':
+    case 'shower':
+    case 'toilet':
+    case 'washbasin':
+    case 'floor_drain':
+      return c.success;
     default:
       return c.accent;
   }
