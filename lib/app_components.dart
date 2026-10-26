@@ -326,6 +326,63 @@ class AppInputField extends StatelessWidget {
 /// transparent background. Reused wherever the app shows its own logo
 /// (auth screen, welcome top bar, dashboard rail) instead of each screen
 /// loading the asset itself.
+/// A round profile picture, or the user's [initials] on the brand gradient
+/// when there is none (or it fails to load).
+class AppAvatar extends StatelessWidget {
+  const AppAvatar({
+    super.key,
+    required this.initials,
+    required this.size,
+    this.imageUrl,
+    this.borderWidth = 1.5,
+    this.textStyle,
+    this.glow = false,
+  });
+
+  final String initials;
+  final double size;
+  final String? imageUrl;
+  final double borderWidth;
+  final TextStyle? textStyle;
+  final bool glow;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final url = imageUrl;
+    final initialsView = Center(
+      child: Text(
+        initials,
+        style: (textStyle ?? context.text.labelLarge)?.copyWith(
+          color: c.onPrimary,
+        ),
+      ),
+    );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: c.brandGradient,
+        border: Border.all(color: c.glassBorder, width: borderWidth),
+        boxShadow: glow ? AppShadows.glow(c.primary) : null,
+      ),
+      child: SizedBox.square(
+        dimension: size,
+        child: ClipOval(
+          child: url == null
+              ? initialsView
+              : Image.network(
+                  url,
+                  fit: BoxFit.cover,
+                  semanticLabel: 'Profile picture',
+                  errorBuilder: (context, error, stackTrace) => initialsView,
+                ),
+        ),
+      ),
+    );
+  }
+}
+
 class AppLogoMark extends StatelessWidget {
   const AppLogoMark({super.key, this.size = 40});
 
