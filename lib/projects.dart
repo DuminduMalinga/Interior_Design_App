@@ -58,7 +58,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       appBar: AppBar(title: const Text('Your projects')),
       floatingActionButton: FloatingActionButton(
         heroTag: 'new-project',
-        onPressed: () => _switchTab(context, 2),
+        onPressed: () => _switchTab(context, 3),
         tooltip: 'New project',
         child: const Icon(Icons.add_rounded, size: 28),
       ),
@@ -111,7 +111,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                   )
                 else if (results.isEmpty)
                   _query.isEmpty
-                      ? _EmptyProjects(onUpload: () => _switchTab(context, 2))
+                      ? _EmptyProjects(onUpload: () => _switchTab(context, 3))
                       : _NoResults(query: _query)
                 else
                   AppResponsiveGrid(
