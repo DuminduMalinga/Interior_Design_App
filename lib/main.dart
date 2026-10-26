@@ -13,6 +13,7 @@ import 'data/models.dart';
 import 'data/supabase_service.dart';
 import 'env.dart';
 import 'responsive.dart';
+import 'theme_controller.dart';
 
 part 'splash.dart';
 part 'dashboard.dart';
@@ -37,6 +38,7 @@ part 'room_pieces_dining.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await ThemeController.instance.load();
   await Supabase.initialize(
     url: SupabaseEnv.url,
     publishableKey: SupabaseEnv.anonKey,
@@ -86,12 +88,17 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: navigatorKey,
-      title: 'LiviSpace',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme(),
-      home: const SplashScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeController.instance,
+      builder: (context, mode, _) => MaterialApp(
+        navigatorKey: navigatorKey,
+        title: 'LiviSpace',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme(),
+        darkTheme: AppTheme.darkTheme(),
+        themeMode: mode,
+        home: const SplashScreen(),
+      ),
     );
   }
 }

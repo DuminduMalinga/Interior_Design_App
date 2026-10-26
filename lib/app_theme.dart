@@ -129,6 +129,40 @@ class AppColors extends ThemeExtension<AppColors> {
     ),
   );
 
+  /// The light palette: the same roles as [dark], on white and pale blue.
+  /// Accents are a shade deeper so they keep their contrast on a light
+  /// background.
+  static const AppColors light = AppColors(
+    background: Color(0xFFF4F7FC),
+    backgroundElevated: Color(0xFFFFFFFF),
+    surface: Color(0xFFFFFFFF),
+    surfaceElevated: Color(0xFFEBF0FA),
+    border: Color(0xFFD8E0F0),
+    primary: Color(0xFF2F6BF0),
+    onPrimary: Color(0xFFFFFFFF),
+    secondary: Color(0xFF7352F0),
+    accent: Color(0xFF0E9A8F),
+    success: Color(0xFF1B9A60),
+    warning: Color(0xFFC27B0E),
+    error: Color(0xFFD93A4C),
+    textPrimary: Color(0xFF0F1730),
+    textSecondary: Color(0xFF3E4A66),
+    textMuted: Color(0xFF66728F),
+    glassFill: Color(0xB3FFFFFF),
+    glassBorder: Color(0x260F1730),
+    scrim: Color(0xB80F1730),
+    backgroundGradient: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFFF8FAFF), Color(0xFFF4F7FC), Color(0xFFEDF1FB)],
+    ),
+    brandGradient: LinearGradient(
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+      colors: [Color(0xFF2F6BF0), Color(0xFF7352F0)],
+    ),
+  );
+
   final Color background;
   final Color backgroundElevated;
   final Color surface;
@@ -243,8 +277,11 @@ extension AppThemeContext on BuildContext {
 class AppTheme {
   const AppTheme._();
 
-  static ThemeData darkTheme() {
-    const c = AppColors.dark;
+  static ThemeData darkTheme() => _build(AppColors.dark, Brightness.dark);
+
+  static ThemeData lightTheme() => _build(AppColors.light, Brightness.light);
+
+  static ThemeData _build(AppColors c, Brightness brightness) {
     final text = _textTheme(c);
 
     RoundedRectangleBorder shape(BorderRadius r) =>
@@ -258,22 +295,24 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.dark,
+      brightness: brightness,
       scaffoldBackgroundColor: c.background,
       dividerColor: c.border,
-      colorScheme: ColorScheme.dark(
+      colorScheme: ColorScheme(
+        brightness: brightness,
         primary: c.primary,
         onPrimary: c.onPrimary,
         secondary: c.secondary,
         onSecondary: c.onPrimary,
         tertiary: c.accent,
         error: c.error,
+        onError: brightness == Brightness.dark ? Colors.black : Colors.white,
         surface: c.surface,
         onSurface: c.textPrimary,
         outline: c.border,
       ),
       textTheme: text,
-      extensions: const [AppColors.dark],
+      extensions: [c],
       appBarTheme: AppBarTheme(
         backgroundColor: c.background,
         foregroundColor: c.textPrimary,
