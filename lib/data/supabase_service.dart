@@ -823,7 +823,9 @@ class AdminRepository {
   Future<List<AdminUserRecord>> fetchUsers() async {
     final rows = await supa
         .from('User')
-        .select('UserID, UserName, FullName, Email, LastSignIn, Role')
+        .select(
+          'UserID, UserName, FullName, Email, LastSignIn, Role, AvatarUrl',
+        )
         .order('FullName', ascending: true);
     return rows.map(AdminUserRecord.fromJson).toList();
   }
