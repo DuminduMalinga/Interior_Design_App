@@ -10,6 +10,7 @@ import 'app_theme.dart';
 import 'data/avatar.dart';
 import 'data/layout_service.dart';
 import 'data/models.dart';
+import 'data/site_news.dart';
 import 'data/supabase_service.dart';
 import 'env.dart';
 import 'responsive.dart';
