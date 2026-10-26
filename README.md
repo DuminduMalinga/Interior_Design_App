@@ -1,136 +1,221 @@
-﻿# LiviSpace
+# LiviSpace
 
-*Design spaces for better living.*
+> **Design spaces for better living.**
 
-LiviSpace is a Flutter prototype for an AI-powered interior design workflow. It guides a user from a splash screen through sign-up, a floor-plan upload, AI analysis, room selection, and ranked layout recommendations they can confirm and view in 3D.
+LiviSpace is a cross-platform Flutter app that turns floor plans into personalized,
+AI-assisted interior designs. Upload a plan, review detected rooms, explore
+layout recommendations, and save your favorite spaces in an interactive 3D
+viewer.
 
+[![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white)](https://flutter.dev/)
+[![Dart](https://img.shields.io/badge/Dart-3.10%2B-0175C2?logo=dart&logoColor=white)](https://dart.dev/)
+[![Supabase](https://img.shields.io/badge/Backend-Supabase-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
+[![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20iOS%20%7C%20Web%20%7C%20Desktop-6C63FF)](#supported-platforms)
 
+## Contents
 
-## Context for picking this up
+- [Highlights](#highlights)
+- [How it works](#how-it-works)
+- [Feature overview](#feature-overview)
+- [Architecture](#architecture)
+- [Getting started](#getting-started)
+- [Configuration](#configuration)
+- [Testing](#testing)
+- [Supported platforms](#supported-platforms)
 
-A few things worth knowing before you dig into the code:
+## Highlights
 
-- **Everything is one app, edited across feature branches.** The repo uses a branch per screen or feature (`Welcome_Screen`, `Dashboard`, `Login`, `Profile`, `Room_Viewer`, `Upload_Floor_Plan`, â€¦), each merged into `main` via PR. Because of that, a branch that's been open a while can drift a long way behind `main` â€” merge it in (`git merge main`) before starting new work on an old branch, rather than after, to avoid large conflicts.
-- **The UI runs on a small design system**, not per-screen styling: colors, type, spacing, radii and shadows are tokens in `lib/app_theme.dart`, shared widgets (buttons, cards, chips, inputs) live in `lib/app_components.dart`, and responsive breakpoints/layout helpers live in `lib/responsive.dart`. New screens should pull from these rather than hardcoding a `Color(0x...)` or a `fontSize`.
-- **Every screen is responsive** at three breakpoints â€” mobile (<600px), tablet (600â€“1024px), desktop (>1024px) â€” and `test/screens_test.dart` renders each screen at all three to catch layout overflows.
-- **The brand is "LiviSpace"**, recolored into the app's own blue/violet accent (`AppColors.dark.primary` / `.secondary`); the house-and-plant mark is `assets/images/logo_mark.png`. The OS launcher icon is a separate asset (dark green/cream) generated from the original brand art and hasn't been re-tinted to match.
+- AI-assisted floor-plan analysis
+- Room-specific layout recommendations
+- Interactive room visualization with 3D-style rendering
+- Responsive UI for mobile, tablet, and desktop
+- Supabase authentication, storage, and synchronized designs
+- Light and dark themes with persistent preferences
+- Cross-platform export and sharing
 
-## User journey
+## How it works
 
-1. A splash screen shows the logo and a loading line, then hands off to the welcome screen.
-2. The user reads the pitch and signs up or signs in (or resets a forgotten password).
-3. They land on the dashboard: recent projects, a hero banner, and a tip card.
-4. They upload a JPG/JPEG/PNG floor plan (under 10 MB).
-5. A processing screen waits for the backend analysis to finish.
-6. They review the rooms the AI claims to have detected and pick one.
-7. They compare AI-generated layout options for that room, ranked by match score.
-8. They can view a chosen layout as a rotatable, zoomable 3D room. Export saves the view as a PNG and Share sends it through the system share sheet (the web can also export the 3D model; the app draws the room itself, so there is none).
-9. Admins can review pending sign-ups and approve or reject them from a dedicated screen.
-
-## Features
-
-- Splash screen with logo and loading indicator
-- Welcome screen with product messaging and onboarding CTA
-- Sign in / sign up with validation, password visibility toggles, and a forgot-password flow (locked username/email, new password + confirm)
-- Dashboard with a project preview, hero banner, and navigation that adapts from a bottom nav (mobile) to a side rail (tablet/desktop)
-- A full Projects screen with search over the signed-in user's floor plans
-- Floor-plan upload screen with a dropzone and example plans
-- Processing screen that polls the backend analysis, with progress animation and a timeout/failed state
-- Room detection and selection experience with per-room suitability scores
-- Layout recommendation gallery with a recommended pick, confirm-and-save selection and a 3D gate - â€” a swipeable deck on mobile, a grid on wider screens
-- A 3D room viewer: drag to orbit, pinch or button to zoom
-- Light and dark themes: Profile → Appearance switches between them at once and remembers the choice on the device (dark by default, as on the web)
-- Profile → Help & support (answers to common questions, written from what the app does) and About LiviSpace (how it works, the six rooms it furnishes, the version)
-- Live totals on the welcome screen (registered users, layouts generated, floor plans uploaded), read from the `get_site_stats` database function like the web landing page; they show a dash until loaded or if the lookup fails
-- Admins can email **product news** from Manage accounts (the mail icon): a subject and message go to everyone with the Product news switch on, or to the admin alone with "Send me a test", through the `send-notification` edge function; email must be configured there (`RESEND_API_KEY`)
-- Profile screen (stats, settings, sign out) and admin account moderation (search, filter, approve/reject)
-- Dark, responsive UI built from a shared theme and component library
-
-## App structure
-
-The app is one library: `lib/main.dart` holds the entry point and pulls in every screen as a `part` file, so they all share one set of imports and can reference each other's (even private) classes directly.
-
-| File | Purpose |
-| --- | --- |
-| `lib/main.dart` | Entry point, `MaterialApp`, and `part` declarations |
-| `lib/app_theme.dart` | Design tokens â€” colors, type scale, spacing, radius, shadows |
-| `lib/app_components.dart` | Shared widgets â€” buttons, cards, chips, inputs, logo mark |
-| `lib/responsive.dart` | Breakpoints and responsive layout helpers |
-| `lib/splash.dart` | Splash screen |
-| `lib/welcome.dart` | Landing / onboarding screen |
-| `lib/auth.dart` | Sign in / sign up |
-| `lib/forgot_password.dart` | Password reset (locked identity fields) |
-| `lib/dashboard.dart` | Home dashboard and navigation shell |
-| `lib/projects.dart` | Full, searchable project list |
-| `lib/upload.dart` | Floor-plan upload |
-| `lib/processing.dart` | Sends the floor plan to the wall detector and opens the rooms |
-| `lib/room_selection.dart` | Detected-room review and selection |
-| `lib/layouts.dart` | Ranked layout recommendations |
-| `lib/room_viewer.dart` | Interactive 3D room viewer |
-| `lib/admin_accounts.dart` | Admin account management and activity log |
-| `lib/profile.dart` | User profile and settings |
-
-## Data shared with the web app
-
-The web app ([Interior-Design-Web](https://github.com/DuminduMalinga/Interior-Design-Web)) does not write the relational `Room` / `Layout` / `Furniture` tables. It stores everything on `FloorPlanAnalysis`:
-
-| Column | Written by | Contents |
-| --- | --- | --- |
-| `DetectionJSON` | wall detector | rooms (name, size, position), walls, doors, windows |
-| `LayoutJSON` | living-room layout engine | all engine layouts for one room (`roomId`, `layouts[]`, `bestLayout`); furniture in mm, origin bottom-left |
-| `SelectedLayoutJSON` + `SelectedRoomID` | the user's confirmed choice | the full layout document |
-| `Status` | both | `Detected` -> `LayoutReady` -> `LayoutSelected` |
-
-The mobile app reads these (`lib/data/models.dart`: `AnalysisRoom`, `AnalysisLayoutSet`) and saves a confirmed layout in the same shape, so a plan can be started on the web and finished on mobile, or the reverse. A plan uploaded in the app is analysed by the web's wall detector service (`backend/wall_detector`, `POST /detect`, signed in with the user's Supabase token); the app stores the result as `DetectionJSON` and marks the floor plan `Analysed`, exactly as the web does, and emails the user when the plan is ready. Point it at the service with `--dart-define=DETECTOR_URL=...` (default `http://10.0.2.2:8000`; with `LAYOUT_SERVICE_BASE` it is `<base>/detector`). A plan already analysed on the web opens straight away. Layouts, however, are generated by the app: opening a room calls that room type's layout service from the web repo (`backend/<room>_layout`, signed in with the user's Supabase token) and saves the result as `LayoutJSON`. Rooms are being wired up one at a time (`RoomKind.kindsSupported` in `lib/data/layout_service.dart`); the living room, bedroom, master bedroom, kitchen, bathroom and dining area are done. Point the app at the services with `--dart-define=LAYOUT_SERVICE_BASE=https://<host>` (the Caddy deployment) or an individual `--dart-define=LIVING_ROOM_LAYOUT_URL=...` / `BEDROOM_LAYOUT_URL=...` / `MASTER_BEDROOM_LAYOUT_URL=...` / `KITCHEN_LAYOUT_URL=...` / `BATHROOM_LAYOUT_URL=...` / `DINING_LAYOUT_URL=...`; the default is `http://10.0.2.2:8100` for the living room and `:8200` for the bedroom and `:8600` for the master bedroom and `:8300` for the kitchen and `:8400` for the bathroom and `:8500` for the dining area (local `uvicorn api:app --port <port>` seen from the Android emulator). The older `Room`/`Layout` tables are still read as a fallback.
-
-Confirming a layout also keeps it as a **saved design** (`SavedDesign`, the table the web dashboard lists; the app's **Designs** tab lists them too, opens one in 3D and removes it with its files, like the web's My Designs) and emails "design saved" through the `send-notification` edge function; the Profile tab's profile picture (tap it to choose or remove one; stored in the public `avatars` bucket and recorded as `User.AvatarUrl`, scaled to 512 px, like the web) also shows on Home, and its **Email notifications** and **Product news** switches are the same `User.NotificationPrefs` the web profile uses.
-
-Account rules follow the web: a user deletes their own account after entering their password (their files are removed, then `delete_my_account` runs); an admin can delete customers only, through the `delete-user` edge function, never another admin or themselves; the admin page's **Activity** tab shows `AdminAuditLog`. The old `DeletionRequest` table no longer exists.
-
-The database and edge functions are the web project's: `supabase/migrations/` (apply in name order) and `supabase/functions/` (`send-notification`, `delete-user`, `username-login`) are copies of `Interior-Design-Web/backend/supabase`.
-## Wall detector (`wall_detector/`)
-
-A Python service that produces the `DetectionJSON` document described above: a YOLO model (`best.pt`) finds rooms, walls, doors and windows, and EasyOCR reads each room's label and written size. Sizes are returned in metres, from `12'6" x 13'0"`, `3.5 x 4.0 m` or `mm` labels; plans that only print an area (`10.5 m²`) get sides derived from the room's shape; rooms with no printed size are estimated from the rooms that have one (or from an overall `40 ft` dimension line) and marked `dimensionsSource: "estimated"`.
-
-```bash
-cd wall_detector
-pip install -r requirements.txt
-# place the trained weights at wall_detector/best.pt (or set WALL_DETECTOR_WEIGHTS)
-python run.py plan.jpeg          # writes plan.detection.json
-uvicorn server:app --port 8001   # POST /analyze with a `file` upload
-python -m unittest test_labels
-
-# analyse plans uploaded from the app (service-role key from Supabase > Project Settings > API)
-set SUPABASE_SERVICE_KEY=...     # PowerShell: $env:SUPABASE_SERVICE_KEY="..."
-python worker.py
+```text
+Create an account
+      |
+Upload a floor plan
+      |
+AI detects rooms, walls, doors, and windows
+      |
+Choose a room and compare recommended layouts
+      |
+Confirm a design
+      |
+Explore, export, share, and revisit it in 3D
 ```
+
+## Feature overview
+
+### Discover and manage projects
+
+- Welcome and onboarding experience with live site statistics.
+- Dashboard with recent projects, design tips, and responsive navigation.
+- Searchable Projects screen for all uploaded floor plans.
+- Pull-to-refresh and clear loading, empty, retry, and failure states.
+
+### AI-assisted design workflow
+
+- Upload JPG, JPEG, or PNG floor plans up to 10 MB.
+- Processing state with backend polling, progress feedback, timeout, and
+  failure handling.
+- Room detection with room type, estimated dimensions, area, and suitability
+  score.
+- Support for living rooms, bedrooms, master bedrooms, kitchens, bathrooms,
+  and dining areas.
+- Ranked layout recommendations with match scores, tags, and a recommended
+  option.
+- Confirmed layouts are saved as reusable designs.
+
+### Explore and share designs
+
+- Designs tab for saved rooms created in the app or on the connected web app.
+- Interactive room viewer with drag-to-orbit and pinch/button zoom controls.
+- Export a rendered room view as a PNG.
+- Share a design through the platform share sheet.
+- Delete saved designs without deleting the original floor plan or layouts.
+
+### Accounts and personalization
+
+- Sign up and sign in with email or username support.
+- Strong password validation and password visibility controls.
+- Forgot-password and reset-password flows.
+- Editable profile photo with image validation and resizing.
+- Profile statistics for projects and rooms.
+- Email notification and product news preferences.
+- Light and dark appearance modes, persisted on the device.
+- Help and About screens.
+
+### Administration
+
+- Admin account management with search and activity filtering.
+- Customer account deletion with protected administrator accounts.
+- Audit log for administrative activity.
+- Product news composer with test-send support.
+
+## Architecture
+
+The app uses a shared Flutter library. [`lib/main.dart`](lib/main.dart) owns
+the application entry point and assembles the feature screens with Dart
+`part` files.
+
+| Area | Location | Responsibility |
+| --- | --- | --- |
+| App entry point | [`lib/main.dart`](lib/main.dart) | Flutter bootstrap, Supabase initialization, theme and navigation |
+| Design system | [`lib/app_theme.dart`](lib/app_theme.dart) | Colors, typography, spacing, radii, shadows, and themes |
+| Shared components | [`lib/app_components.dart`](lib/app_components.dart) | Buttons, cards, inputs, logos, and reusable UI |
+| Responsive layout | [`lib/responsive.dart`](lib/responsive.dart) | Mobile, tablet, and desktop breakpoints |
+| Feature screens | [`lib/`](lib/) | Authentication, dashboard, projects, upload, layouts, profile, and admin flows |
+| Data layer | [`lib/data/`](lib/data/) | Models, repositories, layout services, exports, and Supabase access |
+| Backend schema | [`supabase/migrations/`](supabase/migrations/) | Database tables, functions, and policies |
+| Edge functions | [`supabase/functions/`](supabase/functions/) | Notifications, account deletion, and username login |
+| Wall detector | [`wall_detector/`](wall_detector/) | Python service for detecting rooms and floor-plan features |
+
+### Web app interoperability
+
+LiviSpace shares floor-plan analysis and saved-design data with the companion
+[Interior-Design-Web](https://github.com/DuminduMalinga/Interior-Design-Web)
+application. Analysis and layout documents are stored on the floor-plan
+analysis record, allowing a project started on one platform to be continued
+on the other.
 
 ## Getting started
 
-Requirements:
+### Prerequisites
 
-- Flutter SDK
-- Dart SDK `^3.10.4`
+- Flutter SDK with Dart SDK `^3.10.4`
+- A configured Supabase project
+- Android Studio, Xcode, or a desktop toolchain for the target platform
 
-Install dependencies and run the app:
+### Install and run
 
 ```bash
+git clone https://github.com/DuminduMalinga/Interior_Design_App.git
+cd Interior_Design_App
 flutter pub get
 flutter run
 ```
 
+List available devices with:
+
+```bash
+flutter devices
+```
+
+Run on a specific device:
+
+```bash
+flutter run -d <device-id>
+```
+
+## Configuration
+
+The app reads deployment-specific values through Flutter compile-time
+environment variables. Do not commit credentials or service-role keys.
+
+### Supabase
+
+Configure the Supabase URL and publishable/anonymous key in the app's
+environment setup used by [`lib/env.dart`](lib/env.dart). Apply the migrations
+in [`supabase/migrations/`](supabase/migrations/) to the target project.
+
+### AI services
+
+The floor-plan detector and room layout services can be configured at runtime:
+
+```bash
+flutter run \
+  --dart-define=DETECTOR_URL=http://10.0.2.2:8000 \
+  --dart-define=LAYOUT_SERVICE_BASE=https://<service-host>
+```
+
+Individual layout endpoints can also be supplied with
+`LIVING_ROOM_LAYOUT_URL`, `BEDROOM_LAYOUT_URL`, `MASTER_BEDROOM_LAYOUT_URL`,
+`KITCHEN_LAYOUT_URL`, `BATHROOM_LAYOUT_URL`, and `DINING_LAYOUT_URL`.
+
+### Wall detector service
+
+The optional Python service in [`wall_detector/`](wall_detector/) uses the
+provided YOLO weights to detect rooms, walls, doors, and windows:
+
+```bash
+cd wall_detector
+pip install -r requirements.txt
+uvicorn server:app --port 8000
+```
+
+For local processing of uploaded plans, configure the required Supabase service
+key in the environment used by the worker. Never expose that key to the app or
+commit it to source control.
+
 ## Testing
+
+Run static analysis and the full Flutter test suite:
 
 ```bash
 flutter analyze
 flutter test
 ```
 
-`test/widget_test.dart` covers navigation (tab switching, "See all", forgot password). `test/screens_test.dart` renders every screen at mobile (360px), tablet (800px) and desktop (1440px) widths to catch responsive layout bugs.
+The test suite includes authentication and validation tests, model and service
+tests, navigation tests, export tests, theme tests, and responsive screen
+coverage. [`test/screens_test.dart`](test/screens_test.dart) renders screens at
+mobile, tablet, and desktop widths to catch layout overflows.
+
+Run the wall detector tests separately:
+
+```bash
+cd wall_detector
+python -m unittest test_labels
+```
 
 ## Supported platforms
 
-This Flutter app is configured for cross-platform development, including:
+The Flutter project includes targets for:
 
 - Android
 - iOS
@@ -139,14 +224,13 @@ This Flutter app is configured for cross-platform development, including:
 - macOS
 - Linux
 
-Run a specific target with:
+## Project status
 
-```bash
-flutter run -d <device>
-```
+LiviSpace is an actively developed product prototype. The core experience,
+authentication, data persistence, AI service integration, saved designs, and
+responsive UI are implemented; service URLs and Supabase deployment settings
+must be configured for a production environment.
 
-## Notes
+## License
 
-- The app is intended as a product prototype and UX mockup.
-- Auth, storage and data run on Supabase (see `lib/data/`). The AI analysis pipeline that fills `FloorPlanAnalysis`, `Room` and `Layout` is a separate backend.
-- Future work can include real image processing, backend APIs, persistent user data, and production-ready validation.
+No license has been declared for this repository yet.
