@@ -51,7 +51,13 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         ? null
         : query.isEmpty
         ? projects
-        : projects.where((p) => p.title.toLowerCase().contains(query)).toList();
+        : projects
+              .where(
+                (p) =>
+                    p.title.toLowerCase().contains(query) ||
+                    p.summary.stage.label.toLowerCase().contains(query),
+              )
+              .toList();
 
     return _TabScaffold(
       selectedIndex: 1,
@@ -86,7 +92,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 AppInputField(
                   controller: _searchController,
                   onChanged: (v) => setState(() => _query = v),
-                  hintText: 'Search projects',
+                  hintText: 'Search by name or status',
                   prefixIcon: Icons.search_rounded,
                   suffixIcon: _searchController.text.isEmpty
                       ? null
@@ -119,9 +125,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     tabletColumns: 3,
                     desktopColumns: 4,
                     childAspectRatio: context.responsive(
-                      mobile: 0.88,
-                      tablet: 1.0,
-                      desktop: 1.1,
+                      mobile: 0.74,
+                      tablet: 0.95,
+                      desktop: 1.05,
                     ),
                     children: [
                       for (final (index, project) in results.indexed)

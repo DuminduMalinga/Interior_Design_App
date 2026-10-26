@@ -54,7 +54,7 @@ services, and a shareable 3D-style room experience.
 
 ### 📐 Smart floor-plan analysis
 
-- Upload JPG, JPEG, or PNG plans up to 10 MB
+- Upload JPG, JPEG, or PNG plans up to 10 MB, and check the chosen image in a preview before it is uploaded
 - Detect rooms, walls, doors, and windows
 - Estimate room dimensions and floor area
 - See your uploaded plan with each detected room outlined on it, tap a room on the plan or in the list, and see where its size came from and how sure the detector is
@@ -78,7 +78,8 @@ services, and a shareable 3D-style room experience.
 
 ### 🎨 Explore and share
 
-- Browse projects with search and refresh
+- Browse projects with search and refresh; each card says where the plan is in the flow (Uploaded, Rooms detected, Layouts ready, Layout chosen), what to do next, and the chosen layout's score
+- See your totals on Home: floor plans uploaded, finished plans, and the last layout score
 - Revisit saved designs from the app or web
 - Orbit and zoom around an interactive room view, and reset it to the opening view
 - See a layout's score, whether it is valid, the room's size and every piece in it; pick a piece to see its size, how it was placed and why, and find it outlined in the room (a panel over the room on a phone, beside it on a wider screen)
