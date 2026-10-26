@@ -16,6 +16,7 @@ import 'responsive.dart';
 part 'splash.dart';
 part 'dashboard.dart';
 part 'projects.dart';
+part 'designs.dart';
 part 'upload.dart';
 part 'processing.dart';
 part 'room_selection.dart';
