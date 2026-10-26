@@ -23,19 +23,39 @@ class Room3DViewerScreen extends StatefulWidget {
   State<Room3DViewerScreen> createState() => _Room3DViewerScreenState();
 }
 
+/// What Export and Share can give: the picture of the view, or the room as
+/// a 3D model.
+enum _ExportKind { picture, model }
+
 class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
   static const _minYaw = -.6;
   static const _maxYaw = .6;
   static const _minZoom = .7;
   static const _maxZoom = 1.6;
 
-  static const _startYaw = -.28;
+  static const _startYaw = _IsoRoomPainter.startYaw;
   static const _startZoom = 1.0;
 
   double _yaw = _startYaw;
   double _zoom = _startZoom;
   double _yawStart = 0;
   double _zoomStart = 1;
+
+  /// Where on screen the drag began, so the turn follows the finger from
+  /// there rather than from the last movement.
+  Offset _dragStart = Offset.zero;
+
+  /// A layout from the engines can be looked at from every side; the older
+  /// stylised room only from the front.
+  bool get _freeOrbit => widget.layout.analysis != null;
+
+  /// Turns the view by [by] radians: all the way round for an engine layout,
+  /// within a narrow range for the stylised one.
+  void _turn(double by) => setState(
+    () => _yaw = _freeOrbit
+        ? wrapAngle(_yaw + by)
+        : (_yaw + by).clamp(_minYaw, _maxYaw),
+  );
 
   /// Marks the drawn room, so its picture can be saved or shared.
   final _pictureKey = GlobalKey();
@@ -91,28 +111,107 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
     }
   }
 
-  Future<void> _export() =>
-      _withPicture('Could not save the picture.', (png) async {
-        final saved = await FilePicker.saveFile(
-          fileName: '$_fileStem.png',
-          bytes: png,
-          mimeType: 'image/png',
-          dialogTitle: 'Save picture',
-        );
-        if (saved != null) _say('Picture saved.');
-      });
+  /// Asks whether to take the picture or the 3D model. A layout with no
+  /// room size to build a model from can only give the picture.
+  Future<_ExportKind?> _chooseKind() async {
+    final analysis = widget.layout.analysis;
+    if (analysis == null || !canExportModel(analysis)) {
+      return _ExportKind.picture;
+    }
+    return showModalBottomSheet<_ExportKind>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.image_outlined),
+              title: const Text('Picture'),
+              subtitle: const Text('PNG of the current view'),
+              onTap: () => Navigator.of(context).pop(_ExportKind.picture),
+            ),
+            ListTile(
+              leading: const Icon(Icons.view_in_ar_rounded),
+              title: const Text('3D model'),
+              subtitle: const Text('GLB, real size in metres'),
+              onTap: () => Navigator.of(context).pop(_ExportKind.model),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-  Future<void> _share(Rect? origin) =>
-      _withPicture('Could not share the picture.', (png) async {
+  /// Builds the room as a `.glb` model, one at a time like a picture.
+  Future<void> _withModel(
+    String failure,
+    Future<void> Function(Uint8List glb) action,
+  ) async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    try {
+      await action(
+        roomToGlb(widget.layout.analysis!, roomName: widget.room.name),
+      );
+    } catch (_) {
+      _say(failure);
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  Future<void> _export() async {
+    final kind = await _chooseKind();
+    if (kind == null || !mounted) return;
+    if (kind == _ExportKind.model) {
+      return _withModel('Could not save the model.', (glb) async {
+        final saved = await FilePicker.saveFile(
+          fileName: '$_fileStem.glb',
+          bytes: glb,
+          mimeType: 'model/gltf-binary',
+          dialogTitle: 'Save 3D model',
+        );
+        if (saved != null) _say('Model saved.');
+      });
+    }
+    return _withPicture('Could not save the picture.', (png) async {
+      final saved = await FilePicker.saveFile(
+        fileName: '$_fileStem.png',
+        bytes: png,
+        mimeType: 'image/png',
+        dialogTitle: 'Save picture',
+      );
+      if (saved != null) _say('Picture saved.');
+    });
+  }
+
+  Future<void> _share(Rect? origin) async {
+    final kind = await _chooseKind();
+    if (kind == null || !mounted) return;
+    final caption = '${widget.room.name}: ${widget.layout.title}';
+    if (kind == _ExportKind.model) {
+      return _withModel('Could not share the model.', (glb) async {
         await SharePlus.instance.share(
-          pictureShareParams(
-            png: png,
-            fileName: '$_fileStem.png',
-            text: '${widget.room.name}: ${widget.layout.title}',
+          modelShareParams(
+            glb: glb,
+            fileName: '$_fileStem.glb',
+            text: caption,
             origin: origin,
           ),
         );
       });
+    }
+    return _withPicture('Could not share the picture.', (png) async {
+      await SharePlus.instance.share(
+        pictureShareParams(
+          png: png,
+          fileName: '$_fileStem.png',
+          text: caption,
+          origin: origin,
+        ),
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -146,16 +245,18 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
         Positioned.fill(
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onScaleStart: (_) {
+            onScaleStart: (details) {
               _yawStart = _yaw;
               _zoomStart = _zoom;
+              _dragStart = details.focalPoint;
             },
             onScaleUpdate: (details) {
               setState(() {
-                _yaw = (_yawStart + details.focalPointDelta.dx * .0025).clamp(
-                  _minYaw,
-                  _maxYaw,
-                );
+                final dragged = details.focalPoint.dx - _dragStart.dx;
+                _yaw = _freeOrbit
+                    // about a full turn for a swipe across a phone
+                    ? wrapAngle(_yawStart + dragged * .0075)
+                    : (_yawStart + dragged * .0025).clamp(_minYaw, _maxYaw);
                 if (details.scale != 1.0) {
                   _zoom = (_zoomStart * details.scale).clamp(
                     _minZoom,
@@ -210,10 +311,8 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
           bottom: overlay ? panelHeight + 96 : 0,
           child: Center(
             child: _GestureRail(
-              onRotateLeft: () =>
-                  setState(() => _yaw = (_yaw - .16).clamp(_minYaw, _maxYaw)),
-              onRotateRight: () =>
-                  setState(() => _yaw = (_yaw + .16).clamp(_minYaw, _maxYaw)),
+              onRotateLeft: () => _turn(_freeOrbit ? -math.pi / 8 : -.16),
+              onRotateRight: () => _turn(_freeOrbit ? math.pi / 8 : .16),
               onZoomIn: () => setState(
                 () => _zoom = (_zoom + .12).clamp(_minZoom, _maxZoom),
               ),
@@ -639,6 +738,50 @@ class _IsoRoomPainter extends CustomPainter {
     ];
   }
 
+  /// The view the room opens in, turned a little from straight on.
+  static const startYaw = -.28;
+
+  /// Height of the walls in painter units.
+  double get _wallHeight {
+    final a = analysis;
+    return a != null && a.roomWidth > 0
+        ? (a.roomHeight * (_roomW / a.roomWidth)).clamp(60.0, 140.0)
+        : _roomH;
+  }
+
+  /// Where the middle of the floor falls on the plan of the screen when the
+  /// room is turned by [angle] (before scaling).
+  Offset _floorCentre(double angle) {
+    final mx = _roomW / 2, my = _roomD / 2;
+    final rx = mx * math.cos(angle) - my * math.sin(angle);
+    final ry = mx * math.sin(angle) + my * math.cos(angle);
+    return Offset(
+      (rx - ry) * math.cos(math.pi / 6),
+      (rx + ry) * math.sin(math.pi / 6),
+    );
+  }
+
+  /// The screen height the middle of the floor stays at. It is chosen so the
+  /// whole room, walls included, is centred in the view when it opens, and
+  /// then kept: the room turns about that point.
+  double _pivotY(Size size) {
+    final c = math.cos(startYaw), s = math.sin(startYaw);
+    var low = double.infinity, high = -double.infinity;
+    for (final (x, y) in [
+      (0.0, 0.0),
+      (_roomW, 0.0),
+      (_roomW, _roomD),
+      (0.0, _roomD),
+    ]) {
+      final sy = ((x * c - y * s) + (x * s + y * c)) * math.sin(math.pi / 6);
+      low = math.min(low, sy - _wallHeight); // the top of the wall
+      high = math.max(high, sy);
+    }
+    final scale = size.shortestSide / 330;
+    return (size.height - bottomInset) / 2 -
+        ((low + high) / 2 - _floorCentre(startYaw).dy) * scale;
+  }
+
   Offset _project(double x, double y, double z, Size size) {
     final rx = x * math.cos(yaw) - y * math.sin(yaw);
     final ry = x * math.sin(yaw) + y * math.cos(yaw);
@@ -646,16 +789,11 @@ class _IsoRoomPainter extends CustomPainter {
     final scale = (size.shortestSide / 330) * zoom;
     final sx = (rx - ry) * math.cos(math.pi / 6);
     final sy = (rx + ry) * math.sin(math.pi / 6) - z;
-    // keep the middle of the floor in the middle of the view, whatever the
-    // room's proportions (a long room otherwise sits off to one side)
-    final mx = _roomW / 2, my = _roomD / 2;
-    final centreX =
-        ((mx * math.cos(yaw) - my * math.sin(yaw)) -
-            (mx * math.sin(yaw) + my * math.cos(yaw))) *
-        math.cos(math.pi / 6);
+    // the middle of the floor stays put as the room turns about it
+    final centre = _floorCentre(yaw);
     return Offset(
-      size.width / 2 + (sx - centreX) * scale,
-      (size.height - bottomInset) * .6 + sy * scale,
+      size.width / 2 + (sx - centre.dx) * scale,
+      _pivotY(size) + (sy - centre.dy) * scale,
     );
   }
 
@@ -788,11 +926,17 @@ class _IsoRoomPainter extends CustomPainter {
 
     // the two far walls (north and west), with their doors and windows
     final wall = Color.lerp(accent, Colors.white, .86)!.withValues(alpha: .55);
-    _wall(canvas, size, a, k, wallH, 'north', wall);
-    _wall(canvas, size, a, k, wallH, 'west', wall);
+    // the two walls farthest from the camera stand; the two nearest show
+    // only as a skirting line and their openings
+    final far = _farWalls();
+    for (final side in const ['north', 'west', 'south', 'east']) {
+      if (far.contains(side)) {
+        _wall(canvas, size, a, k, wallH, side, wall);
+      } else {
+        _nearEdge(canvas, size, a, k, side);
+      }
+    }
     // the two near walls show only as a skirting line and their openings
-    _nearEdge(canvas, size, a, k, 'south');
-    _nearEdge(canvas, size, a, k, 'east');
 
     final solids = _buildFurniture(
       a.furniture,
@@ -890,6 +1034,10 @@ class _IsoRoomPainter extends CustomPainter {
   }
 
   /// Wall position (mm along the wall) to painter units.
+  /// The two walls farthest from the camera at the current turn: the ones
+  /// to stand up behind the furniture.
+  Set<String> _farWalls() => farthestWalls(yaw, width: _roomW, depth: _roomD);
+
   double _along(String wall, double pos, double k) =>
       wall == 'north' || wall == 'south'
       ? pos * k
@@ -904,10 +1052,15 @@ class _IsoRoomPainter extends CustomPainter {
     String side,
     Color color,
   ) {
-    final north = side == 'north';
+    final alongX = side == 'north' || side == 'south';
+    final line = switch (side) {
+      'south' => _roomD,
+      'east' => _roomW,
+      _ => 0.0,
+    };
     Offset at(double t, double z) =>
-        north ? _project(t, 0, z, size) : _project(0, t, z, size);
-    final length = north ? _roomW : _roomD;
+        alongX ? _project(t, line, z, size) : _project(line, t, z, size);
+    final length = alongX ? _roomW : _roomD;
     _quad(canvas, [
       at(0, 0),
       at(length, 0),
@@ -955,10 +1108,15 @@ class _IsoRoomPainter extends CustomPainter {
     double k,
     String side,
   ) {
-    final south = side == 'south';
+    final alongX = side == 'north' || side == 'south';
+    final line = switch (side) {
+      'south' => _roomD,
+      'east' => _roomW,
+      _ => 0.0,
+    };
     Offset at(double t) =>
-        south ? _project(t, _roomD, 0, size) : _project(_roomW, t, 0, size);
-    final length = south ? _roomW : _roomD;
+        alongX ? _project(t, line, 0, size) : _project(line, t, 0, size);
+    final length = alongX ? _roomW : _roomD;
     canvas.drawLine(
       at(0),
       at(length),
@@ -1025,18 +1183,28 @@ class _IsoRoomPainter extends CustomPainter {
       _project(s.x1, s.y1, s.z1, size),
       _project(s.x0, s.y1, s.z1, size),
     ], Paint()..color = top);
-    _quad(canvas, [
-      _project(s.x0, s.y1, s.z0, size),
-      _project(s.x1, s.y1, s.z0, size),
-      _project(s.x1, s.y1, s.z1, size),
-      _project(s.x0, s.y1, s.z1, size),
-    ], Paint()..color = yShade);
-    _quad(canvas, [
-      _project(s.x1, s.y0, s.z0, size),
-      _project(s.x1, s.y1, s.z0, size),
-      _project(s.x1, s.y1, s.z1, size),
-      _project(s.x1, s.y0, s.z1, size),
-    ], Paint()..color = xShade);
+    // Each side, as its outward direction and the two bottom corners. It
+    // shows when it faces the camera once the room is turned, and is shaded
+    // by whether it faces the left or right of the screen, so the light
+    // stays put as the room turns.
+    final cosY = math.cos(yaw), sinY = math.sin(yaw);
+    for (final (nx, ny, c0, c1) in [
+      (1.0, 0.0, Offset(s.x1, s.y0), Offset(s.x1, s.y1)), // east
+      (-1.0, 0.0, Offset(s.x0, s.y1), Offset(s.x0, s.y0)), // west
+      (0.0, 1.0, Offset(s.x0, s.y1), Offset(s.x1, s.y1)), // south
+      (0.0, -1.0, Offset(s.x1, s.y0), Offset(s.x0, s.y0)), // north
+    ]) {
+      final rx = nx * cosY - ny * sinY;
+      final ry = nx * sinY + ny * cosY;
+      if (rx + ry <= 0) continue;
+      final shade = -.18 - .0924 * ((rx - ry) * math.cos(math.pi / 6));
+      _quad(canvas, [
+        _project(c0.dx, c0.dy, s.z0, size),
+        _project(c1.dx, c1.dy, s.z0, size),
+        _project(c1.dx, c1.dy, s.z1, size),
+        _project(c0.dx, c0.dy, s.z1, size),
+      ], Paint()..color = _tone(s.color, shade).withValues(alpha: alpha));
+    }
   }
 
   void _drawBox(Canvas canvas, Size size, _FurnitureBox p) {
