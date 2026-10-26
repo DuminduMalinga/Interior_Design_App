@@ -32,6 +32,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   AppUserProfile? _profile;
   bool _isAdmin = false;
   ({int projects, int rooms})? _stats;
+  bool _avatarBusy = false;
 
   @override
   void didChangeDependencies() {
@@ -54,6 +55,103 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _stats = results[1] as ({int projects, int rooms});
       _isAdmin = results[2] as bool;
     });
+  }
+
+  /// Lets the user choose a new picture or remove the current one.
+  Future<void> _editAvatar() async {
+    final hasPicture = _profile?.avatarUrl != null;
+    final choice = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: Text(hasPicture ? 'Choose a new photo' : 'Choose a photo'),
+              onTap: () => Navigator.of(context).pop(true),
+            ),
+            if (hasPicture)
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded),
+                title: const Text('Remove photo'),
+                onTap: () => Navigator.of(context).pop(false),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    if (choice) {
+      await _pickAvatar();
+    } else {
+      await _removeAvatar();
+    }
+  }
+
+  void _say(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _pickAvatar() async {
+    final user = AuthService.instance.currentUser;
+    if (user == null) return;
+    final file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: avatarExtensions,
+    );
+    if (file == null) return;
+
+    final extension = (file.extension ?? file.name.split('.').last)
+        .toLowerCase();
+    final problem = checkAvatarFile(
+      extension: extension,
+      size: await file.length(),
+    );
+    if (problem != null) return _say(problem);
+
+    setState(() => _avatarBusy = true);
+    try {
+      final picture = await shrinkAvatar(
+        await file.readAsBytes(),
+        avatarContentType(extension),
+      );
+      await AvatarRepository.instance.upload(
+        userId: user.id,
+        bytes: picture.bytes,
+        contentType: picture.contentType,
+      );
+      await _reloadProfile();
+    } catch (_) {
+      _say('The picture could not be saved. Try again.');
+    } finally {
+      if (mounted) setState(() => _avatarBusy = false);
+    }
+  }
+
+  Future<void> _removeAvatar() async {
+    final user = AuthService.instance.currentUser;
+    if (user == null) return;
+    setState(() => _avatarBusy = true);
+    try {
+      await AvatarRepository.instance.remove(user.id);
+      await _reloadProfile();
+    } catch (_) {
+      _say('The picture could not be removed. Try again.');
+    } finally {
+      if (mounted) setState(() => _avatarBusy = false);
+    }
+  }
+
+  Future<void> _reloadProfile() async {
+    final user = AuthService.instance.currentUser;
+    if (user == null) return;
+    final profile = await UserRepository.instance.fetchProfile(user.id);
+    if (!mounted) return;
+    setState(() => _profile = profile ?? _profile);
   }
 
   /// Saves a notification choice to the account (shared with the web app),
@@ -86,6 +184,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       name: profile?.fullName ?? 'Loading...',
       email: profile?.email ?? user?.email ?? '',
       initials: profile?.initials ?? '?',
+      avatarUrl: profile?.avatarUrl,
+      avatarBusy: _avatarBusy,
+      onEditAvatar: profile == null ? null : _editAvatar,
     );
     final statsRow = Row(
       children: [
@@ -494,11 +595,21 @@ class _ProfileHeader extends StatelessWidget {
     required this.name,
     required this.email,
     required this.initials,
+    required this.avatarUrl,
+    required this.avatarBusy,
+    required this.onEditAvatar,
   });
 
   final String name;
   final String email;
   final String initials;
+  final String? avatarUrl;
+
+  /// A picture is being saved or removed.
+  final bool avatarBusy;
+
+  /// Null until the profile has loaded.
+  final VoidCallback? onEditAvatar;
 
   @override
   Widget build(BuildContext context) {
@@ -507,45 +618,60 @@ class _ProfileHeader extends StatelessWidget {
 
     return Row(
       children: [
-        Stack(
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: c.brandGradient,
-                border: Border.all(color: c.glassBorder, width: 2),
-                boxShadow: AppShadows.glow(c.primary),
-              ),
-              child: SizedBox.square(
-                dimension: 76,
-                child: Center(
-                  child: Text(
-                    initials,
-                    style: text.headlineSmall?.copyWith(color: c.onPrimary),
+        Semantics(
+          button: true,
+          label: avatarUrl == null
+              ? 'Add a profile picture'
+              : 'Change profile picture',
+          child: GestureDetector(
+            onTap: avatarBusy ? null : onEditAvatar,
+            child: Stack(
+              children: [
+                AppAvatar(
+                  initials: initials,
+                  imageUrl: avatarUrl,
+                  size: 76,
+                  borderWidth: 2,
+                  textStyle: text.headlineSmall,
+                  glow: true,
+                ),
+                if (avatarBusy)
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: c.scrim,
+                      ),
+                      child: const Center(
+                        child: SizedBox.square(
+                          dimension: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2.4),
+                        ),
+                      ),
+                    ),
+                  ),
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: c.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: c.background, width: 2),
+                    ),
+                    child: SizedBox.square(
+                      dimension: 26,
+                      child: Icon(
+                        Icons.camera_alt_rounded,
+                        color: c.onPrimary,
+                        size: 13,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: c.primary,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: c.background, width: 2),
-                ),
-                child: SizedBox.square(
-                  dimension: 26,
-                  child: Icon(
-                    Icons.camera_alt_rounded,
-                    color: c.onPrimary,
-                    size: 13,
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
         const SizedBox(width: AppSpacing.lg),
         Expanded(
