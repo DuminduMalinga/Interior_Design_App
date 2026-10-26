@@ -29,14 +29,29 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
   static const _minZoom = .7;
   static const _maxZoom = 1.6;
 
-  double _yaw = -.28;
-  double _zoom = 1.0;
+  static const _startYaw = -.28;
+  static const _startZoom = 1.0;
+
+  double _yaw = _startYaw;
+  double _zoom = _startZoom;
   double _yawStart = 0;
   double _zoomStart = 1;
 
   /// Marks the drawn room, so its picture can be saved or shared.
   final _pictureKey = GlobalKey();
   bool _exporting = false;
+
+  /// The piece picked in the details panel; it is outlined in the room.
+  String? _selectedId;
+
+  /// Whether the details panel is open over the room. On a phone it opens
+  /// above the toolbar; on a wider screen it is always beside the room.
+  bool _detailsOpen = false;
+
+  void _resetView() => setState(() {
+    _yaw = _startYaw;
+    _zoom = _startZoom;
+  });
 
   void _say(String message) {
     if (!mounted) return;
@@ -105,120 +120,195 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
     final room = widget.room;
     final layout = widget.layout;
     final roomColor = room.colorIn(c);
+    final wide = !context.screenSize.isMobile;
+    final analysis = layout.analysis;
+    AnalysisFurniture? picked;
+    for (final f in analysis?.furniture ?? const <AnalysisFurniture>[]) {
+      if (f.id == _selectedId) picked = f;
+    }
+    final details = analysis == null
+        ? null
+        : RoomDetailsPanel(
+            layout: analysis,
+            selectedId: _selectedId,
+            onSelect: (id) => setState(() => _selectedId = id),
+            colorFor: (type) => _furnitureColor(type, c),
+            // a phone's panel is short: give a picked piece all of it
+            compact: !wide,
+          );
+    final panelHeight = math.min(
+      MediaQuery.sizeOf(context).height * .42,
+      360.0,
+    );
+    final overlay = !wide && details != null && _detailsOpen;
+    final viewer = Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onScaleStart: (_) {
+              _yawStart = _yaw;
+              _zoomStart = _zoom;
+            },
+            onScaleUpdate: (details) {
+              setState(() {
+                _yaw = (_yawStart + details.focalPointDelta.dx * .0025).clamp(
+                  _minYaw,
+                  _maxYaw,
+                );
+                if (details.scale != 1.0) {
+                  _zoom = (_zoomStart * details.scale).clamp(
+                    _minZoom,
+                    _maxZoom,
+                  );
+                }
+              });
+            },
+            child: RepaintBoundary(
+              key: _pictureKey,
+              child: AppBackground(
+                child: CustomPaint(
+                  painter: _IsoRoomPainter(
+                    accent: roomColor,
+                    floor: c.surface,
+                    grid: c.glassFill,
+                    variant: layout.variant,
+                    yaw: _yaw,
+                    zoom: _zoom,
+                    placedFurniture: layout.furniture,
+                    analysis: layout.analysis,
+                    highlight: picked,
+                    highlightColor: c.warning,
+                    bottomInset: overlay ? panelHeight + 96 : 0,
+                  ),
+                  size: Size.infinite,
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: AppSpacing.xs,
+          left: AppSpacing.md,
+          child: _GlassIconButton(
+            icon: Icons.close_rounded,
+            onTap: () => Navigator.of(context).maybePop(),
+          ),
+        ),
+        Positioned(
+          top: AppSpacing.xs,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: _TitlePill(room: room, layout: layout),
+          ),
+        ),
+        Positioned(
+          right: AppSpacing.md,
+          top: 0,
+          // clear of the details panel when it is open over the room
+          bottom: overlay ? panelHeight + 96 : 0,
+          child: Center(
+            child: _GestureRail(
+              onRotateLeft: () =>
+                  setState(() => _yaw = (_yaw - .16).clamp(_minYaw, _maxYaw)),
+              onRotateRight: () =>
+                  setState(() => _yaw = (_yaw + .16).clamp(_minYaw, _maxYaw)),
+              onZoomIn: () => setState(
+                () => _zoom = (_zoom + .12).clamp(_minZoom, _maxZoom),
+              ),
+              onZoomOut: () => setState(
+                () => _zoom = (_zoom - .12).clamp(_minZoom, _maxZoom),
+              ),
+              onReset: _resetView,
+            ),
+          ),
+        ),
+        Positioned(
+          left: AppSpacing.lg,
+          right: AppSpacing.lg,
+          bottom: AppSpacing.md,
+          // Keeps the toolbar a sensible width on tablet and desktop.
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: _ViewerToolbar(
+                accent: roomColor,
+                busy: _exporting,
+                onExport: _export,
+                onShare: _share,
+                onDetails: wide || details == null
+                    ? null
+                    : () => setState(() => _detailsOpen = !_detailsOpen),
+                detailsOpen: _detailsOpen,
+              ),
+            ),
+          ),
+        ),
+        if (overlay)
+          Positioned(
+            left: AppSpacing.lg,
+            right: AppSpacing.lg,
+            bottom: 96,
+            height: panelHeight,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: c.backgroundElevated.withValues(alpha: 0.96),
+                    borderRadius: AppRadius.xlAll,
+                    border: Border.all(color: c.glassBorder),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: AppRadius.xlAll,
+                    child: details,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
     return Scaffold(
       body: SafeArea(
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onScaleStart: (_) {
-                  _yawStart = _yaw;
-                  _zoomStart = _zoom;
-                },
-                onScaleUpdate: (details) {
-                  setState(() {
-                    _yaw = (_yawStart + details.focalPointDelta.dx * .0025)
-                        .clamp(_minYaw, _maxYaw);
-                    if (details.scale != 1.0) {
-                      _zoom = (_zoomStart * details.scale).clamp(
-                        _minZoom,
-                        _maxZoom,
-                      );
-                    }
-                  });
-                },
-                child: RepaintBoundary(
-                  key: _pictureKey,
-                  child: AppBackground(
-                    child: CustomPaint(
-                      painter: _IsoRoomPainter(
-                        accent: roomColor,
-                        floor: c.surface,
-                        grid: c.glassFill,
-                        variant: layout.variant,
-                        yaw: _yaw,
-                        zoom: _zoom,
-                        placedFurniture: layout.furniture,
-                        analysis: layout.analysis,
+        child: wide && details != null
+            ? Row(
+                children: [
+                  // the drawing is not clipped by itself; keep it off the panel
+                  Expanded(child: ClipRect(child: viewer)),
+                  SizedBox(
+                    width: 360,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: Border(left: BorderSide(color: c.border)),
                       ),
-                      size: Size.infinite,
+                      child: details,
                     ),
                   ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: AppSpacing.xs,
-              left: AppSpacing.md,
-              child: _GlassIconButton(
-                icon: Icons.close_rounded,
-                onTap: () => Navigator.of(context).maybePop(),
-              ),
-            ),
-            Positioned(
-              top: AppSpacing.xs,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: _TitlePill(room: room, layout: layout),
-              ),
-            ),
-            Positioned(
-              right: AppSpacing.md,
-              top: 0,
-              bottom: 0,
-              child: Center(
-                child: _GestureRail(
-                  onRotateLeft: () => setState(
-                    () => _yaw = (_yaw - .16).clamp(_minYaw, _maxYaw),
-                  ),
-                  onRotateRight: () => setState(
-                    () => _yaw = (_yaw + .16).clamp(_minYaw, _maxYaw),
-                  ),
-                  onZoomIn: () => setState(
-                    () => _zoom = (_zoom + .12).clamp(_minZoom, _maxZoom),
-                  ),
-                  onZoomOut: () => setState(
-                    () => _zoom = (_zoom - .12).clamp(_minZoom, _maxZoom),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              left: AppSpacing.lg,
-              right: AppSpacing.lg,
-              bottom: AppSpacing.md,
-              // Keeps the toolbar a sensible width on tablet and desktop.
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 480),
-                  child: _ViewerToolbar(
-                    accent: roomColor,
-                    busy: _exporting,
-                    onExport: _export,
-                    onShare: _share,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+                ],
+              )
+            : viewer,
       ),
     );
   }
 }
 
 class _GlassIconButton extends StatelessWidget {
-  const _GlassIconButton({required this.icon, required this.onTap});
+  const _GlassIconButton({
+    required this.icon,
+    required this.onTap,
+    this.tooltip,
+  });
 
   final IconData icon;
   final VoidCallback onTap;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Material(
+    final button = Material(
       type: MaterialType.transparency,
       child: InkWell(
         onTap: onTap,
@@ -236,6 +326,7 @@ class _GlassIconButton extends StatelessWidget {
         ),
       ),
     );
+    return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
   }
 }
 
@@ -281,12 +372,16 @@ class _GestureRail extends StatelessWidget {
     required this.onRotateRight,
     required this.onZoomIn,
     required this.onZoomOut,
+    required this.onReset,
   });
 
   final VoidCallback onRotateLeft;
   final VoidCallback onRotateRight;
   final VoidCallback onZoomIn;
   final VoidCallback onZoomOut;
+
+  /// Back to the opening view.
+  final VoidCallback onReset;
 
   @override
   Widget build(BuildContext context) {
@@ -303,6 +398,12 @@ class _GestureRail extends StatelessWidget {
           icon: Icons.rotate_right_rounded,
           onTap: onRotateRight,
         ),
+        const SizedBox(height: AppSpacing.xl),
+        _GlassIconButton(
+          icon: Icons.restart_alt_rounded,
+          tooltip: 'Reset view',
+          onTap: onReset,
+        ),
       ],
     );
   }
@@ -314,9 +415,17 @@ class _ViewerToolbar extends StatelessWidget {
     required this.busy,
     required this.onExport,
     required this.onShare,
+    this.onDetails,
+    this.detailsOpen = false,
   });
 
   final Color accent;
+
+  /// Shows or hides the details panel; null when there is none to toggle
+  /// (the panel is always beside the room on a wide screen, and a layout
+  /// without engine data has no details).
+  final VoidCallback? onDetails;
+  final bool detailsOpen;
 
   /// A picture is being made, so Export and Share wait.
   final bool busy;
@@ -366,21 +475,18 @@ class _ViewerToolbar extends StatelessWidget {
               },
             ),
           ),
-          _ToolbarAction(
-            icon: Icons.edit_outlined,
-            label: 'Edit',
-            accent: accent,
-            onTap: () => _notify(context, 'Edit'),
-          ),
+          if (onDetails != null)
+            _ToolbarAction(
+              icon: detailsOpen
+                  ? Icons.keyboard_arrow_down_rounded
+                  : Icons.info_outline_rounded,
+              label: detailsOpen ? 'Hide' : 'Details',
+              accent: accent,
+              onTap: onDetails!,
+            ),
         ],
       ),
     );
-  }
-
-  void _notify(BuildContext context, String action) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$action coming soon.')));
   }
 }
 
@@ -450,7 +556,18 @@ class _IsoRoomPainter extends CustomPainter {
     required this.zoom,
     this.placedFurniture = const [],
     this.analysis,
+    this.highlight,
+    this.highlightColor = const Color(0xFFFFB020),
+    this.bottomInset = 0,
   });
+
+  /// Height at the bottom of the view that something else covers (the details
+  /// panel on a phone); the room is centred in what is left.
+  final double bottomInset;
+
+  /// The piece to outline in the room, if one is picked.
+  final AnalysisFurniture? highlight;
+  final Color highlightColor;
 
   /// A layout from the web pipeline. When set, the room takes its real
   /// proportions and the furniture its real positions and heights.
@@ -525,10 +642,21 @@ class _IsoRoomPainter extends CustomPainter {
   Offset _project(double x, double y, double z, Size size) {
     final rx = x * math.cos(yaw) - y * math.sin(yaw);
     final ry = x * math.sin(yaw) + y * math.cos(yaw);
-    final scale = (size.shortestSide / 300) * zoom;
+    // sized so the whole room fits its area with a margin, whatever its shape
+    final scale = (size.shortestSide / 330) * zoom;
     final sx = (rx - ry) * math.cos(math.pi / 6);
     final sy = (rx + ry) * math.sin(math.pi / 6) - z;
-    return Offset(size.width / 2 + sx * scale, size.height * .6 + sy * scale);
+    // keep the middle of the floor in the middle of the view, whatever the
+    // room's proportions (a long room otherwise sits off to one side)
+    final mx = _roomW / 2, my = _roomD / 2;
+    final centreX =
+        ((mx * math.cos(yaw) - my * math.sin(yaw)) -
+            (mx * math.sin(yaw) + my * math.cos(yaw))) *
+        math.cos(math.pi / 6);
+    return Offset(
+      size.width / 2 + (sx - centreX) * scale,
+      (size.height - bottomInset) * .6 + sy * scale,
+    );
   }
 
   void _quad(Canvas canvas, List<Offset> pts, Paint paint) {
@@ -696,6 +824,68 @@ class _IsoRoomPainter extends CustomPainter {
     ];
     for (final s in [...flat, ...upright, ...glass]) {
       _drawSolid(canvas, size, s);
+    }
+    final picked = highlight;
+    if (picked != null) _paintHighlight(canvas, size, k, wallH, picked);
+  }
+
+  /// Outlines the picked piece as a box from where it starts to its top, so
+  /// it can be found in the room: its footprint, its top and the edges
+  /// between, in the highlight colour.
+  void _paintHighlight(
+    Canvas canvas,
+    Size size,
+    double k,
+    double wallH,
+    AnalysisFurniture f,
+  ) {
+    var z0 = 0.0;
+    var z1 = (f.height * k).clamp(1.0, wallH);
+    switch (f.mounted) {
+      case 'ceiling':
+        z0 = wallH;
+        z1 = wallH;
+      case 'wall':
+        z0 = ((f.mountHeight ?? 0) * k).clamp(0.0, wallH);
+        z1 = (z0 + f.height * k).clamp(z0, wallH);
+      case 'drain':
+        z1 = 1;
+    }
+    final footprints = f.shape == 'l' && f.parts.isNotEmpty
+        ? f.parts
+        : [
+            [f.x0, f.y0, f.x1, f.y1],
+          ];
+    final edge = Paint()
+      ..color = highlightColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.4
+      ..strokeJoin = StrokeJoin.round;
+    final post = Paint()
+      ..color = highlightColor.withValues(alpha: .8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+    final wash = Paint()..color = highlightColor.withValues(alpha: .22);
+
+    for (final r in footprints) {
+      final px0 = r[0] * k, px1 = r[2] * k;
+      final py0 = _roomD - r[3] * k, py1 = _roomD - r[1] * k;
+      List<Offset> ring(double z) => [
+        _project(px0, py0, z, size),
+        _project(px1, py0, z, size),
+        _project(px1, py1, z, size),
+        _project(px0, py1, z, size),
+      ];
+      final base = ring(z0);
+      final top = ring(z1);
+      _quad(canvas, base, wash);
+      canvas.drawPath(Path()..addPolygon(base, true), edge);
+      if (z1 > z0) {
+        canvas.drawPath(Path()..addPolygon(top, true), edge);
+        for (var i = 0; i < 4; i++) {
+          canvas.drawLine(base[i], top[i], post);
+        }
+      }
     }
   }
 
@@ -911,7 +1101,10 @@ class _IsoRoomPainter extends CustomPainter {
       oldDelegate.grid != grid ||
       oldDelegate.variant != variant ||
       oldDelegate.placedFurniture != placedFurniture ||
-      oldDelegate.analysis != analysis;
+      oldDelegate.analysis != analysis ||
+      oldDelegate.highlight != highlight ||
+      oldDelegate.highlightColor != highlightColor ||
+      oldDelegate.bottomInset != bottomInset;
 }
 
 class _FurnitureBox {
@@ -923,3 +1116,30 @@ class _FurnitureBox {
   final double y1;
   final double h;
 }
+
+/// The 3D viewer for [layout] in a room called [roomName]; with no [layout]
+/// it shows the stylised room the older pipeline draws. The screen's own
+/// inputs are private to the app, so tests come in through here.
+@visibleForTesting
+Widget roomViewerForTest({required String roomName, AnalysisLayout? layout}) =>
+    Room3DViewerScreen(
+      room: _DetectedRoom(
+        roomId: 'room-1',
+        name: roomName,
+        icon: Icons.bed_outlined,
+        accent: _RoomAccent.primary,
+        bounds: Rect.zero,
+        suitability: 80,
+        note: '',
+        fromAnalysis: layout != null,
+      ),
+      layout: _LayoutOption(
+        layoutId: layout?.type ?? 'legacy',
+        title: layout?.title ?? 'Legacy layout',
+        tags: const [],
+        matchScore: layout?.score.round().clamp(0, 100) ?? 80,
+        variant: 0,
+        furniture: const [],
+        analysis: layout,
+      ),
+    );
