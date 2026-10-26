@@ -34,6 +34,71 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
   double _yawStart = 0;
   double _zoomStart = 1;
 
+  /// Marks the drawn room, so its picture can be saved or shared.
+  final _pictureKey = GlobalKey();
+  bool _exporting = false;
+
+  void _say(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// The file name, without extension, for this room's picture.
+  String get _fileStem => exportFileStem(
+    widget.room.name,
+    widget.layout.analysis?.type ?? widget.layout.title,
+  );
+
+  /// Runs a save or share of the room's picture, one at a time, telling the
+  /// user if the picture can't be made or the action fails.
+  Future<void> _withPicture(
+    String failure,
+    Future<void> Function(Uint8List png) action,
+  ) async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    try {
+      final png = await capturePng(
+        _pictureKey,
+        pixelRatio: MediaQuery.devicePixelRatioOf(context).clamp(1.0, 3.0),
+      );
+      if (png == null) {
+        _say('The 3D view is not ready yet.');
+        return;
+      }
+      await action(png);
+    } catch (_) {
+      _say(failure);
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  Future<void> _export() =>
+      _withPicture('Could not save the picture.', (png) async {
+        final saved = await FilePicker.saveFile(
+          fileName: '$_fileStem.png',
+          bytes: png,
+          mimeType: 'image/png',
+          dialogTitle: 'Save picture',
+        );
+        if (saved != null) _say('Picture saved.');
+      });
+
+  Future<void> _share(Rect? origin) =>
+      _withPicture('Could not share the picture.', (png) async {
+        await SharePlus.instance.share(
+          pictureShareParams(
+            png: png,
+            fileName: '$_fileStem.png',
+            text: '${widget.room.name}: ${widget.layout.title}',
+            origin: origin,
+          ),
+        );
+      });
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -63,19 +128,22 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
                     }
                   });
                 },
-                child: AppBackground(
-                  child: CustomPaint(
-                    painter: _IsoRoomPainter(
-                      accent: roomColor,
-                      floor: c.surface,
-                      grid: c.glassFill,
-                      variant: layout.variant,
-                      yaw: _yaw,
-                      zoom: _zoom,
-                      placedFurniture: layout.furniture,
-                      analysis: layout.analysis,
+                child: RepaintBoundary(
+                  key: _pictureKey,
+                  child: AppBackground(
+                    child: CustomPaint(
+                      painter: _IsoRoomPainter(
+                        accent: roomColor,
+                        floor: c.surface,
+                        grid: c.glassFill,
+                        variant: layout.variant,
+                        yaw: _yaw,
+                        zoom: _zoom,
+                        placedFurniture: layout.furniture,
+                        analysis: layout.analysis,
+                      ),
+                      size: Size.infinite,
                     ),
-                    size: Size.infinite,
                   ),
                 ),
               ),
@@ -125,7 +193,12 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 480),
-                  child: _ViewerToolbar(accent: roomColor),
+                  child: _ViewerToolbar(
+                    accent: roomColor,
+                    busy: _exporting,
+                    onExport: _export,
+                    onShare: _share,
+                  ),
                 ),
               ),
             ),
@@ -236,9 +309,21 @@ class _GestureRail extends StatelessWidget {
 }
 
 class _ViewerToolbar extends StatelessWidget {
-  const _ViewerToolbar({required this.accent});
+  const _ViewerToolbar({
+    required this.accent,
+    required this.busy,
+    required this.onExport,
+    required this.onShare,
+  });
 
   final Color accent;
+
+  /// A picture is being made, so Export and Share wait.
+  final bool busy;
+  final VoidCallback onExport;
+
+  /// Gets the area of the Share button, which iPad anchors its sheet to.
+  final void Function(Rect? origin) onShare;
 
   @override
   Widget build(BuildContext context) {
@@ -261,14 +346,25 @@ class _ViewerToolbar extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _ToolbarAction(
-            icon: Icons.ios_share_rounded,
+            icon: Icons.download_rounded,
             label: 'Export',
-            onTap: () => _notify(context, 'Export'),
+            busy: busy,
+            onTap: onExport,
           ),
-          _ToolbarAction(
-            icon: Icons.share_rounded,
-            label: 'Share',
-            onTap: () => _notify(context, 'Share'),
+          Builder(
+            builder: (context) => _ToolbarAction(
+              icon: Icons.share_rounded,
+              label: 'Share',
+              busy: busy,
+              onTap: () {
+                final box = context.findRenderObject();
+                onShare(
+                  box is RenderBox && box.hasSize
+                      ? box.localToGlobal(Offset.zero) & box.size
+                      : null,
+                );
+              },
+            ),
           ),
           _ToolbarAction(
             icon: Icons.edit_outlined,
@@ -294,6 +390,7 @@ class _ToolbarAction extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.accent,
+    this.busy = false,
   });
 
   final IconData icon;
@@ -301,13 +398,16 @@ class _ToolbarAction extends StatelessWidget {
   final VoidCallback onTap;
   final Color? accent;
 
+  /// Dims the action and ignores taps while something else is running.
+  final bool busy;
+
   @override
   Widget build(BuildContext context) {
     final color = accent ?? context.colors.textPrimary;
     return Material(
       type: MaterialType.transparency,
       child: InkWell(
-        onTap: onTap,
+        onTap: busy ? null : onTap,
         borderRadius: AppRadius.smAll,
         child: Padding(
           padding: const EdgeInsets.symmetric(
@@ -317,11 +417,17 @@ class _ToolbarAction extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 20, color: color),
+              Icon(
+                icon,
+                size: 20,
+                color: busy ? color.withValues(alpha: 0.4) : color,
+              ),
               const SizedBox(height: AppSpacing.xs),
               Text(
                 label,
-                style: context.text.labelSmall?.copyWith(color: color),
+                style: context.text.labelSmall?.copyWith(
+                  color: busy ? color.withValues(alpha: 0.4) : color,
+                ),
               ),
             ],
           ),
