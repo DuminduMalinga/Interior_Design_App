@@ -34,6 +34,12 @@ class _AuthScreenState extends State<AuthScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
+  /// Says whether the username being typed is free (the server is asked
+  /// after a pause in typing).
+  late final _usernameChecker = UsernameChecker(
+    lookup: AuthService.instance.isUsernameAvailable,
+  );
+
   late bool _isSignUp = !widget.startInSignIn;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -41,6 +47,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   void dispose() {
+    _usernameChecker.dispose();
     _fullNameController.dispose();
     _usernameController.dispose();
     _emailController.dispose();
@@ -100,6 +107,7 @@ class _AuthScreenState extends State<AuthScreen> {
               prefixIcon: Icons.alternate_email_rounded,
               keyboardType: TextInputType.text,
               textInputAction: TextInputAction.next,
+              onChanged: _usernameChecker.onChanged,
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'Enter a username';
                 if (v.trim().length < 3) return 'At least 3 characters';
@@ -108,6 +116,11 @@ class _AuthScreenState extends State<AuthScreen> {
                 }
                 return null;
               },
+            ),
+            ValueListenableBuilder<UsernameStatus>(
+              valueListenable: _usernameChecker,
+              builder: (context, status, _) =>
+                  UsernameStatusLine(status: status),
             ),
             const SizedBox(height: AppSpacing.lg),
           ],
@@ -161,6 +174,11 @@ class _AuthScreenState extends State<AuthScreen> {
                 : (v == null || v.isEmpty ? 'Enter your password' : null),
           ),
           if (_isSignUp) ...[
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _passwordController,
+              builder: (context, value, _) =>
+                  PasswordStrengthMeter(password: value.text),
+            ),
             const SizedBox(height: AppSpacing.lg),
             AppInputField(
               controller: _confirmPasswordController,
@@ -233,7 +251,10 @@ class _AuthScreenState extends State<AuthScreen> {
                 style: text.bodySmall?.copyWith(color: c.textMuted),
               ),
               TextButton(
-                onPressed: () => setState(() => _isSignUp = !_isSignUp),
+                onPressed: () {
+                  _usernameChecker.reset();
+                  setState(() => _isSignUp = !_isSignUp);
+                },
                 child: Text(_isSignUp ? 'Sign in' : 'Sign up'),
               ),
             ],
@@ -310,6 +331,7 @@ class _AuthScreenState extends State<AuthScreen> {
         if (!mounted) return;
         _passwordController.clear();
         _confirmPasswordController.clear();
+        _usernameChecker.reset();
         setState(() {
           _isSignUp = false;
           _submitting = false;

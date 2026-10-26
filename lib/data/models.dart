@@ -349,6 +349,7 @@ class AdminUserRecord {
     required this.email,
     required this.role,
     this.lastSignIn,
+    this.avatarUrl,
   });
 
   factory AdminUserRecord.fromJson(Map<String, dynamic> json) {
@@ -365,6 +366,9 @@ class AdminUserRecord {
       lastSignIn: json['LastSignIn'] == null
           ? null
           : DateTime.tryParse(json['LastSignIn'] as String),
+      avatarUrl: (json['AvatarUrl'] as String?)?.trim().isNotEmpty == true
+          ? (json['AvatarUrl'] as String).trim()
+          : null,
     );
   }
 
@@ -374,6 +378,9 @@ class AdminUserRecord {
   final String email;
   final String role;
   final DateTime? lastSignIn;
+
+  /// The account's profile picture, if it has set one.
+  final String? avatarUrl;
 
   bool get isAdmin => role.trim().toLowerCase() == 'admin';
   String get displayName => fullName.isNotEmpty ? fullName : userName;
