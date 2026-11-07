@@ -298,8 +298,10 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
         ),
         Positioned(
           top: AppSpacing.xs,
-          left: 0,
-          right: 0,
+          // clear of the close button, and the same on both sides so the
+          // title stays centred
+          left: 72,
+          right: 72,
           child: Center(
             child: _TitlePill(room: room, layout: layout),
           ),
@@ -453,9 +455,13 @@ class _TitlePill extends StatelessWidget {
         children: [
           Icon(room.icon, size: 14, color: room.colorIn(c)),
           const SizedBox(width: AppSpacing.sm - 2),
-          Text(
-            '${layout.title} · ${room.name}',
-            style: context.text.labelMedium,
+          Flexible(
+            child: Text(
+              '${layout.title} · ${room.name}',
+              style: context.text.labelMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),

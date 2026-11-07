@@ -78,9 +78,9 @@ The detector reads walls, doors, windows and room names from the plan, and estim
 
 ### Layouts and 3D view
 
-| AI layout choices | Saved design details |
-|:---:|:---:|
-| <img src="docs/screenshots/layout-choices.png" alt="AI layout choices" width="240" /> | <img src="docs/screenshots/saved-design-details.png" alt="Saved design details" width="240" /> |
+| AI layout choices | Saved designs | Saved design details |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/layout-choices.png" alt="AI layout choices" width="210" /> | <img src="docs/screenshots/saved-designs.png" alt="Saved designs" width="210" /> | <img src="docs/screenshots/saved-design-details.png" alt="Saved design details" width="210" /> |
 
 Interactive 3D layouts are available for each supported room type.
 
@@ -310,6 +310,30 @@ For local processing of uploaded plans, configure the required Supabase service
 key only in the worker environment. Never expose it to the app or source
 control.
 
+### Run the whole stack locally
+
+The app needs the wall detector and the six layout services for room detection
+and layouts. They live in the companion
+[Interior-Design-Web](https://github.com/DuminduMalinga/Interior-Design-Web)
+repository under `backend/`; start them all with `backend/run_all.ps1`.
+
+For local development only, turn off the sign-in check and allow your app's
+origin before starting the services:
+
+```powershell
+$env:REQUIRE_AUTH = "false"
+$env:ALLOWED_ORIGINS = "http://localhost:8765"   # the origin you serve the web build from
+```
+
+Then point the app at them. On the Android emulator the defaults
+(`http://10.0.2.2:8000`, `:8100` to `:8600`) already work. For web or desktop:
+
+```bash
+flutter run -d chrome   --dart-define=DETECTOR_URL=http://localhost:8000   --dart-define=LIVING_ROOM_LAYOUT_URL=http://localhost:8100   --dart-define=BEDROOM_LAYOUT_URL=http://localhost:8200   --dart-define=KITCHEN_LAYOUT_URL=http://localhost:8300   --dart-define=BATHROOM_LAYOUT_URL=http://localhost:8400   --dart-define=DINING_LAYOUT_URL=http://localhost:8500   --dart-define=MASTER_BEDROOM_LAYOUT_URL=http://localhost:8600
+```
+
+Never disable the sign-in check on a deployed service.
+
 ## Testing
 
 ```bash
@@ -341,9 +365,13 @@ authentication, data persistence, AI service integration, saved designs, and
 responsive UI are implemented. Service URLs and Supabase deployment settings
 must be configured for a production environment.
 
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
+
 ## License
 
-No license has been declared for this repository yet.
+Released under the [MIT License](LICENSE).
 
 <div align="center">
 

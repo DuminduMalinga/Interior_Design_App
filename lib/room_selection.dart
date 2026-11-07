@@ -750,7 +750,8 @@ class _RoomCard extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(child: Text(room.name, style: text.titleSmall)),
-                      if (enabled)
+                      // a room that has not been scored has no match to show
+                      if (enabled && room.suitability > 0)
                         AppStatusChip(
                           label: '${room.suitability}% match',
                           status: status,
