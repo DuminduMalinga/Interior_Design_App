@@ -4,7 +4,7 @@
 
 # LiviSpace
 
-### ✨ Design spaces for better living
+### Design spaces for better living
 
 Turn a floor plan into a beautiful, personalized interior design with
 AI-assisted room analysis, smart layout recommendations, and an interactive
@@ -13,9 +13,9 @@ AI-assisted room analysis, smart layout recommendations, and an interactive
 <p>
   <a href="https://github.com/DuminduMalinga/Interior_Design_App"><strong>Explore the project</strong></a>
   ·
-  <a href="#-getting-started"><strong>Run it locally</strong></a>
+  <a href="#getting-started"><strong>Run it locally</strong></a>
   ·
-  <a href="#-feature-highlights"><strong>See the features</strong></a>
+  <a href="#feature-highlights"><strong>See the features</strong></a>
 </p>
 
 <p>
@@ -39,20 +39,82 @@ AI-assisted room analysis, smart layout recommendations, and an interactive
 > plan. Upload your space, choose a room, discover layouts, and make the
 > design yours.
 
-## 🏠 What is LiviSpace?
+## What is LiviSpace?
 
 LiviSpace is a cross-platform Flutter application for transforming floor plans
 into AI-assisted interior designs. It combines a polished responsive
 interface, Supabase-powered accounts and storage, room detection, layout
 services, and a shareable 3D-style room experience.
 
-## 🌟 Feature highlights
+## Screenshots
+
+A tour of the app. Screens are shown in the dark theme at mobile width; the layout is responsive up to desktop.
+
+<div align="center">
+
+### Sign-up and sign-in
+
+| Welcome | Create account | Sign in |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/welcome.png" alt="Welcome" width="210" /> | <img src="docs/screenshots/sign-up.png" alt="Create account" width="210" /> | <img src="docs/screenshots/sign-in.png" alt="Sign in" width="210" /> |
+
+| Forgot password | Reset password |
+|:---:|:---:|
+| <img src="docs/screenshots/forgot-password.png" alt="Forgot password" width="210" /> | <img src="docs/screenshots/reset-password.png" alt="Reset password" width="210" /> |
+
+### Projects and floor plans
+
+| Home | Projects | Upload a floor plan |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/home.png" alt="Home" width="210" /> | <img src="docs/screenshots/projects.png" alt="Projects" width="210" /> | <img src="docs/screenshots/upload.png" alt="Upload a floor plan" width="210" /> |
+
+### Room detection
+
+The detector reads walls, doors, windows and room names from the plan, and estimates each room's size.
+
+| Analysing the plan | Detected rooms | Rooms ready to furnish |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/processing.png" alt="Analysing the plan" width="210" /> | <img src="docs/screenshots/room-selection.png" alt="Detected rooms" width="210" /> | <img src="docs/screenshots/room-selection-list.png" alt="Rooms ready to furnish" width="210" /> |
+
+### Layouts and 3D view
+
+| AI layout choices | Saved design details |
+|:---:|:---:|
+| <img src="docs/screenshots/layout-choices.png" alt="AI layout choices" width="240" /> | <img src="docs/screenshots/saved-design-details.png" alt="Saved design details" width="240" /> |
+
+Interactive 3D layouts are available for each supported room type.
+
+| Bedroom | Kitchen |
+|:---:|:---:|
+| <img src="docs/screenshots/layout-bedroom.png" alt="Bedroom" width="210" /> | <img src="docs/screenshots/layout-kitchen.png" alt="Kitchen" width="210" /> |
+
+| Dining room |
+|:---:|
+| <img src="docs/screenshots/layout-dining-room.png" alt="Dining room" width="210" /> |
+
+| Desktop layout with room details |
+|:---:|
+| <img src="docs/screenshots/room-3d-viewer-desktop.png" alt="Desktop layout with room details" width="560" /> |
+
+### Account, administration and support
+
+| Profile | Manage accounts (admin) |
+|:---:|:---:|
+| <img src="docs/screenshots/profile.png" alt="Profile" width="210" /> | <img src="docs/screenshots/admin-accounts.png" alt="Manage accounts (admin)" width="210" /> |
+
+| About | Help and support |
+|:---:|:---:|
+| <img src="docs/screenshots/about.png" alt="About" width="210" /> | <img src="docs/screenshots/help.png" alt="Help and support" width="210" /> |
+
+</div>
+
+## Feature highlights
 
 <table>
 <tr>
 <td width="50%" valign="top">
 
-### 📐 Smart floor-plan analysis
+### Smart floor-plan analysis
 
 - Upload JPG, JPEG, or PNG plans up to 10 MB, and check the chosen image in a preview before it is uploaded
 - Detect rooms, walls, doors, and windows
@@ -64,7 +126,7 @@ services, and a shareable 3D-style room experience.
 </td>
 <td width="50%" valign="top">
 
-### 🛋️ Personalized layouts
+### Personalized layouts
 
 - Explore room-specific recommendations
 - Compare match scores and layout tags
@@ -76,7 +138,7 @@ services, and a shareable 3D-style room experience.
 <tr>
 <td width="50%" valign="top">
 
-### 🎨 Explore and share
+### Explore and share
 
 - Browse projects with search and refresh; each card says where the plan is in the flow (Uploaded, Rooms detected, Layouts ready, Layout chosen), what to do next, and the chosen layout's score
 - See your totals on Home: floor plans uploaded, finished plans, and the last layout score
@@ -88,7 +150,7 @@ services, and a shareable 3D-style room experience.
 </td>
 <td width="50%" valign="top">
 
-### 👤 Personal experience
+### Personal experience
 
 - Email or username authentication
 - Sign-up checks as you type: whether the username is free (after a short pause) and how strong the password is
@@ -101,7 +163,7 @@ services, and a shareable 3D-style room experience.
 <tr>
 <td width="50%" valign="top">
 
-### 🧭 Responsive by design
+### Responsive by design
 
 - Mobile bottom navigation
 - Tablet and desktop side navigation
@@ -111,7 +173,7 @@ services, and a shareable 3D-style room experience.
 </td>
 <td width="50%" valign="top">
 
-### 🔐 Administration
+### Administration
 
 - Search and manage customer accounts, filter them by role (with counts), sort them by name, email, role or last activity, and see each account's profile picture
 - Protected administrator accounts
@@ -122,7 +184,7 @@ services, and a shareable 3D-style room experience.
 </tr>
 </table>
 
-## 🚀 The LiviSpace journey
+## The LiviSpace journey
 
 <div align="center">
 
@@ -143,7 +205,7 @@ flowchart LR
     F --> G[Export or share]
 ```
 
-## 🧩 Built with
+## Built with
 
 | Layer | Technology |
 | --- | --- |
@@ -154,7 +216,7 @@ flowchart LR
 | File handling | `file_picker`, PNG export, and `share_plus` |
 | Local preferences | `shared_preferences` |
 
-## 🗂️ Project structure
+## Project structure
 
 <details>
 <summary><strong>View the main modules</strong></summary>
@@ -174,14 +236,14 @@ flowchart LR
 
 </details>
 
-### 🔗 Web app interoperability
+### Web app interoperability
 
 LiviSpace shares floor-plan analysis and saved-design data with the companion
 [Interior-Design-Web](https://github.com/DuminduMalinga/Interior-Design-Web)
 application. A project can be started on one platform and continued on the
 other through shared analysis and layout documents.
 
-## ⚡ Getting started
+## Getting started
 
 ### Prerequisites
 
@@ -208,7 +270,7 @@ flutter run -d <device-id>
 
 </details>
 
-## ⚙️ Configuration
+## Configuration
 
 The app reads deployment-specific values through Flutter compile-time
 environment variables. Never commit credentials or Supabase service-role keys.
@@ -248,7 +310,7 @@ For local processing of uploaded plans, configure the required Supabase service
 key only in the worker environment. Never expose it to the app or source
 control.
 
-## 🧪 Testing
+## Testing
 
 ```bash
 flutter analyze
@@ -266,20 +328,20 @@ cd wall_detector
 python -m unittest test_labels
 ```
 
-## 🖥️ Supported platforms
+## Supported platforms
 
 | Mobile | Web | Desktop |
 | --- | --- | --- |
 | Android · iOS | Chrome and modern browsers | Windows · macOS · Linux |
 
-## 📌 Project status
+## Project status
 
 LiviSpace is an actively developed product prototype. The core experience,
 authentication, data persistence, AI service integration, saved designs, and
 responsive UI are implemented. Service URLs and Supabase deployment settings
 must be configured for a production environment.
 
-## 📄 License
+## License
 
 No license has been declared for this repository yet.
 
