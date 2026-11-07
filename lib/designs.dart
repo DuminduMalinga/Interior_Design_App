@@ -279,6 +279,19 @@ class _SavedDesignCard extends StatelessWidget {
                         : Image.network(
                             previewUrl,
                             fit: BoxFit.cover,
+                            // the picture is large: show progress, not a
+                            // blank card, while it arrives
+                            loadingBuilder: (context, child, progress) =>
+                                progress == null
+                                ? child
+                                : const Center(
+                                    child: SizedBox.square(
+                                      dimension: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.4,
+                                      ),
+                                    ),
+                                  ),
                             errorBuilder: (context, error, stackTrace) =>
                                 plan(),
                           ),
