@@ -48,63 +48,13 @@ services, and a shareable 3D-style room experience.
 
 ## Screenshots
 
-A tour of the app. Screens are shown in the dark theme at mobile width; the layout is responsive up to desktop.
+A few highlights, shown in the dark theme at mobile width.
 
 <div align="center">
 
-### Sign-up and sign-in
-
-| Welcome | Create account | Sign in |
-|:---:|:---:|:---:|
-| <img src="docs/screenshots/welcome.png" alt="Welcome" width="210" /> | <img src="docs/screenshots/sign-up.png" alt="Create account" width="210" /> | <img src="docs/screenshots/sign-in.png" alt="Sign in" width="210" /> |
-
-| Forgot password | Reset password |
-|:---:|:---:|
-| <img src="docs/screenshots/forgot-password.png" alt="Forgot password" width="210" /> | <img src="docs/screenshots/reset-password.png" alt="Reset password" width="210" /> |
-
-### Projects and floor plans
-
-| Home | Projects | Upload a floor plan |
-|:---:|:---:|:---:|
-| <img src="docs/screenshots/home.png" alt="Home" width="210" /> | <img src="docs/screenshots/projects.png" alt="Projects" width="210" /> | <img src="docs/screenshots/upload.png" alt="Upload a floor plan" width="210" /> |
-
-### Room detection
-
-The detector reads walls, doors, windows and room names from the plan, and estimates each room's size.
-
-| Analysing the plan | Detected rooms | Rooms ready to furnish |
-|:---:|:---:|:---:|
-| <img src="docs/screenshots/processing.png" alt="Analysing the plan" width="210" /> | <img src="docs/screenshots/room-selection.png" alt="Detected rooms" width="210" /> | <img src="docs/screenshots/room-selection-list.png" alt="Rooms ready to furnish" width="210" /> |
-
-### Layouts and 3D view
-
-| AI layout choices | Saved designs | Saved design details |
-|:---:|:---:|:---:|
-| <img src="docs/screenshots/layout-choices.png" alt="AI layout choices" width="210" /> | <img src="docs/screenshots/saved-designs.png" alt="Saved designs" width="210" /> | <img src="docs/screenshots/saved-design-details.png" alt="Saved design details" width="210" /> |
-
-Interactive 3D layouts are available for each supported room type.
-
-| Bedroom | Kitchen |
-|:---:|:---:|
-| <img src="docs/screenshots/layout-bedroom.png" alt="Bedroom" width="210" /> | <img src="docs/screenshots/layout-kitchen.png" alt="Kitchen" width="210" /> |
-
-| Dining room |
-|:---:|
-| <img src="docs/screenshots/layout-dining-room.png" alt="Dining room" width="210" /> |
-
-| Desktop layout with room details |
-|:---:|
-| <img src="docs/screenshots/room-3d-viewer-desktop.png" alt="Desktop layout with room details" width="560" /> |
-
-### Account, administration and support
-
-| Profile | Manage accounts (admin) |
-|:---:|:---:|
-| <img src="docs/screenshots/profile.png" alt="Profile" width="210" /> | <img src="docs/screenshots/admin-accounts.png" alt="Manage accounts (admin)" width="210" /> |
-
-| About | Help and support |
-|:---:|:---:|
-| <img src="docs/screenshots/about.png" alt="About" width="210" /> | <img src="docs/screenshots/help.png" alt="Help and support" width="210" /> |
+| Home | Detected rooms | AI layout choices | Bedroom layout |
+|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/home.png" alt="Home" width="170" /> | <img src="docs/screenshots/room-selection.png" alt="Detected rooms" width="170" /> | <img src="docs/screenshots/layout-choices.png" alt="AI layout choices" width="170" /> | <img src="docs/screenshots/layout-bedroom.png" alt="Bedroom layout" width="170" /> |
 
 </div>
 
