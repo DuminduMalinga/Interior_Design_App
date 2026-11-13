@@ -33,24 +33,16 @@ void _switchTab(BuildContext context, int index) {
 /// rail on wider screens. Every tab screen renders through this so the nav
 /// stays visually identical — and present — no matter which tab is active.
 class _TabScaffold extends StatelessWidget {
-  const _TabScaffold({
-    required this.selectedIndex,
-    required this.body,
-    this.appBar,
-    this.floatingActionButton,
-  });
+  const _TabScaffold({required this.selectedIndex, required this.body});
 
   final int selectedIndex;
   final Widget body;
-  final PreferredSizeWidget? appBar;
-  final Widget? floatingActionButton;
 
   @override
   Widget build(BuildContext context) {
     final size = context.screenSize;
 
     return Scaffold(
-      appBar: appBar,
       body: DecoratedBox(
         decoration: BoxDecoration(gradient: context.colors.backgroundGradient),
         child: SafeArea(
@@ -69,17 +61,102 @@ class _TabScaffold extends StatelessWidget {
         ),
       ),
       // Wide screens show the same destinations in the side rail instead.
-      floatingActionButton: size.isMobile ? floatingActionButton : null,
       bottomNavigationBar: size.isMobile
-          ? BottomNavigationBar(
-              currentIndex: selectedIndex,
-              onTap: (index) => _switchTab(context, index),
-              items: [
-                for (final (icon, label) in _navItems)
-                  BottomNavigationBarItem(icon: Icon(icon), label: label),
-              ],
+          ? _FloatingNavBar(
+              selectedIndex: selectedIndex,
+              onSelected: (index) => _switchTab(context, index),
             )
           : null,
+    );
+  }
+}
+
+/// The floating pill navigation: the active tab shows its label, the Upload
+/// tab is a gold action button, the rest are icons.
+class _FloatingNavBar extends StatelessWidget {
+  const _FloatingNavBar({
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  static const int _uploadIndex = 3;
+
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.only(bottom: AppSpacing.lg),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+        child: Container(
+          height: 64,
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: AppRadius.fullAll,
+            border: Border.all(color: c.border),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              for (final (i, (icon, label)) in _navItems.indexed)
+                _item(context, i, icon, label),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _item(BuildContext context, int i, IconData icon, String label) {
+    final c = context.colors;
+    final selected = i == selectedIndex;
+    final isUpload = i == _uploadIndex;
+    final fg = isUpload
+        ? c.onPrimary
+        : (selected ? c.textPrimary : c.textMuted);
+    final bg = isUpload
+        ? c.primary
+        : (selected ? c.surfaceElevated : Colors.transparent);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: Material(
+        color: bg,
+        borderRadius: AppRadius.fullAll,
+        child: InkWell(
+          borderRadius: AppRadius.fullAll,
+          onTap: () => onSelected(i),
+          child: SizedBox(
+            height: 48,
+            width: selected && !isUpload ? null : 48,
+            child: Padding(
+              padding: selected && !isUpload
+                  ? const EdgeInsets.symmetric(horizontal: AppSpacing.md)
+                  : EdgeInsets.zero,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: AppIconSize.md, color: fg),
+                  if (selected && !isUpload) ...[
+                    const SizedBox(width: AppSpacing.sm),
+                    Text(
+                      label,
+                      style: context.text.labelMedium?.copyWith(color: fg),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -251,12 +328,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return _TabScaffold(
       selectedIndex: 0,
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'new-upload',
-        onPressed: () => _switchTab(context, 3),
-        tooltip: 'New upload',
-        child: const Icon(Icons.add_rounded, size: 28),
-      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: _DashboardContent(
@@ -266,6 +337,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           projects: _projects,
           onSeeAll: () => _switchTab(context, 1),
           onUpload: () => _switchTab(context, 3),
+          onViewDesigns: () => _switchTab(context, 2),
           onAvatarTap: () => _switchTab(context, 4),
           onProjectTap: (p) => _openProject(context, p.record),
           onAdminTap: () => Navigator.of(context).push(
@@ -287,6 +359,7 @@ class _DashboardContent extends StatelessWidget {
     required this.projects,
     required this.onSeeAll,
     required this.onUpload,
+    required this.onViewDesigns,
     required this.onAvatarTap,
     required this.onProjectTap,
     required this.onAdminTap,
@@ -298,20 +371,31 @@ class _DashboardContent extends StatelessWidget {
   final List<_ProjectView>? projects;
   final VoidCallback onSeeAll;
   final VoidCallback onUpload;
+  final VoidCallback onViewDesigns;
   final VoidCallback onAvatarTap;
   final ValueChanged<_ProjectView> onProjectTap;
   final VoidCallback onAdminTap;
 
   @override
   Widget build(BuildContext context) {
-    final hero = _HeroBanner(onUpload: onUpload);
     final recent = projects?.take(4).toList();
+    final current = (projects == null || projects!.isEmpty)
+        ? null
+        : projects!.first;
+    final stats = projects == null || projects!.isEmpty
+        ? null
+        : ProjectStats.of([for (final p in projects!) p.summary]);
+    final hero = _HeroBanner(
+      project: current,
+      lastScore: stats?.lastScore,
+      onUpload: onUpload,
+      onOpen: current == null ? null : () => onProjectTap(current),
+    );
 
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: AppContentFrame(
-        // Keeps the last row clear of the mobile floating action button.
-        bottomInset: size.isMobile ? 72 : 0,
+        bottomInset: size.isMobile ? AppSpacing.xl : 0,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -321,7 +405,7 @@ class _DashboardContent extends StatelessWidget {
               onAvatarTap: onAvatarTap,
               onAdminTap: onAdminTap,
             ),
-            const SizedBox(height: AppSpacing.xxl),
+            const SizedBox(height: AppSpacing.xl),
             if (size.isDesktop)
               IntrinsicHeight(
                 child: Row(
@@ -335,28 +419,121 @@ class _DashboardContent extends StatelessWidget {
               )
             else
               hero,
-            if (projects != null && projects!.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.xl),
-              ProjectStatsRow(
-                stats: ProjectStats.of([for (final p in projects!) p.summary]),
-              ),
+            if (stats != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              ProjectStatsRow(stats: stats),
             ],
-            const SizedBox(height: AppSpacing.xxl),
+            const SizedBox(height: AppSpacing.xl),
+            Text('Quick tools', style: context.text.titleMedium),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                Expanded(
+                  child: _QuickTool(
+                    icon: Icons.cloud_upload_outlined,
+                    title: 'Upload plan',
+                    caption: 'JPG or PNG,\nup to 10 MB',
+                    onTap: onUpload,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: _QuickTool(
+                    icon: Icons.view_in_ar_outlined,
+                    title: '3D viewer',
+                    caption: 'Turn, zoom and\nexport a room',
+                    onTap: onViewDesigns,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xl),
             AppSectionHeader(
-              title: 'Recent Projects',
+              title: 'Recent projects',
               actionLabel: 'See all',
               onAction: onSeeAll,
             ),
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.md),
             _ProjectGrid(
               projects: recent,
               emptyAction: onUpload,
               onTap: onProjectTap,
             ),
             if (!size.isDesktop) ...[
-              const SizedBox(height: AppSpacing.xxl),
+              const SizedBox(height: AppSpacing.xl),
               const _TipCard(),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A square-ish action tile: title and caption on the left, an icon top
+/// right and a gold arrow button at the bottom.
+class _QuickTool extends StatelessWidget {
+  const _QuickTool({
+    required this.icon,
+    required this.title,
+    required this.caption,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String caption;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final text = context.text;
+    return AppCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(AppSpacing.md + 2),
+      child: SizedBox(
+        height: 88,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: text.titleSmall),
+                      const SizedBox(height: 3),
+                      Text(
+                        caption,
+                        style: text.labelSmall?.copyWith(
+                          color: c.textMuted,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(icon, color: c.primary, size: 22),
+              ],
+            ),
+            const Spacer(),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: c.primary,
+                shape: BoxShape.circle,
+              ),
+              child: SizedBox.square(
+                dimension: 28,
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 14,
+                  color: c.onPrimary,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -450,7 +627,7 @@ class _Header extends StatelessWidget {
         style: IconButton.styleFrom(
           backgroundColor: c.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: AppRadius.mdAll,
+            borderRadius: AppRadius.fullAll,
             side: BorderSide(color: c.border),
           ),
         ),
@@ -478,15 +655,15 @@ class _Header extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                firstName == null ? _greeting() : '${_greeting()}, $firstName',
-                style: context.responsive(
-                  mobile: text.titleMedium,
-                  tablet: text.titleLarge,
-                ),
+                'Welcome back,',
+                style: text.bodySmall?.copyWith(color: c.textMuted),
               ),
               Text(
-                'Ready to design something great?',
-                style: text.bodySmall?.copyWith(color: c.textMuted),
+                firstName ?? _greeting(),
+                style: context.responsive(
+                  mobile: text.titleLarge,
+                  tablet: text.headlineSmall,
+                ),
               ),
             ],
           ),
@@ -509,124 +686,180 @@ class _Header extends StatelessWidget {
   }
 }
 
+/// The top card of Home: the project you were last working on, with its
+/// next step, and the last layout score beside it. Before there is a
+/// project it invites the first upload instead.
 class _HeroBanner extends StatelessWidget {
-  const _HeroBanner({required this.onUpload});
+  const _HeroBanner({
+    required this.project,
+    required this.lastScore,
+    required this.onUpload,
+    required this.onOpen,
+  });
 
+  final _ProjectView? project;
+  final int? lastScore;
   final VoidCallback onUpload;
+  final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final text = context.text;
-    final isMobile = context.screenSize.isMobile;
+    final p = project;
+    const ink = Color(0xFFF8F4EE);
+    const inkSoft = Color(0xFFEDE4D8);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: AppRadius.xlAll,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [c.surfaceElevated, c.backgroundElevated, c.background],
-        ),
-        border: Border.all(color: c.primary.withValues(alpha: 0.25)),
-        boxShadow: AppShadows.medium,
-      ),
-      child: ClipRRect(
-        borderRadius: AppRadius.xlAll,
-        child: Stack(
-          children: [
-            Positioned(
-              right: -40,
-              top: -60,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      c.secondary.withValues(alpha: 0.35),
-                      c.primary.withValues(alpha: 0),
-                    ],
-                  ),
-                ),
-                child: const SizedBox.square(dimension: 260),
-              ),
-            ),
-            Positioned(
-              right: AppSpacing.xl,
-              bottom: AppSpacing.xl,
-              child: Transform.rotate(
-                angle: -0.08,
-                child: SizedBox(
-                  width: isMobile ? 84 : 140,
-                  height: isMobile ? 100 : 168,
-                  child: CustomPaint(
-                    painter: _PlanPainter(
-                      accent: c.accent,
-                      lineColor: c.textPrimary,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            ConstrainedBox(
-              constraints: BoxConstraints(minHeight: isMobile ? 176 : 232),
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  AppSpacing.xl,
-                  AppSpacing.xl,
-                  isMobile ? 116 : 200,
-                  AppSpacing.xl,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+    final card = Material(
+      color: Color.alphaBlend(c.secondary.withValues(alpha: .55), c.surface),
+      borderRadius: AppRadius.lgAll,
+      child: InkWell(
+        borderRadius: AppRadius.lgAll,
+        onTap: p == null ? onUpload : onOpen,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 118),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const _AiPill(),
-                    const SizedBox(height: AppSpacing.lg),
                     Text(
-                      'Turn sketches into smart floor plans.',
-                      style: context.responsive(
-                        mobile: text.titleLarge,
-                        tablet: text.headlineMedium,
-                        desktop: text.headlineLarge,
-                      ),
+                      p == null ? 'Get started' : 'Current project',
+                      style: text.labelMedium?.copyWith(color: inkSoft),
                     ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      'Upload an image and let AI do the work.',
-                      style: text.bodyMedium?.copyWith(color: c.textSecondary),
-                    ),
-                    if (!isMobile) ...[
-                      const SizedBox(height: AppSpacing.xl),
-                      AppButton(
-                        label: 'Upload floor plan',
-                        icon: Icons.cloud_upload_outlined,
-                        expanded: false,
-                        onPressed: onUpload,
+                    if (p != null)
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: c.background.withValues(alpha: .35),
+                          borderRadius: AppRadius.fullAll,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md - 2,
+                            vertical: 4,
+                          ),
+                          child: Text(
+                            p.summary.stage.label,
+                            style: text.labelSmall?.copyWith(color: ink),
+                          ),
+                        ),
                       ),
-                    ],
                   ],
                 ),
-              ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  p?.title ?? 'Turn sketches into smart floor plans.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: text.headlineSmall?.copyWith(color: ink),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        p == null
+                            ? 'Upload an image and let AI do the work.'
+                            : 'Next: ${p.summary.stage.nextStep}',
+                        style: text.labelMedium?.copyWith(color: inkSoft),
+                      ),
+                    ),
+                    DecoratedBox(
+                      decoration: const BoxDecoration(
+                        color: ink,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const SizedBox.square(
+                        dimension: 32,
+                        child: Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 16,
+                          color: Color(0xFF1A1612),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         ),
+      ),
+    );
+
+    if (lastScore == null) return card;
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: card),
+          const SizedBox(width: AppSpacing.md),
+          _ScoreRing(score: lastScore!),
+        ],
       ),
     );
   }
 }
 
-/// Shared with the room selection screen, which is why it lives at library
-/// level instead of inside the hero.
-class _AiPill extends StatelessWidget {
-  const _AiPill();
+/// The last layout score, as a gold ring around the number.
+class _ScoreRing extends StatelessWidget {
+  const _ScoreRing({required this.score});
+
+  final int score;
 
   @override
   Widget build(BuildContext context) {
-    return const AppStatusChip(
-      label: 'Powered by AI',
-      status: AppStatus.info,
-      icon: Icons.auto_awesome_rounded,
+    final c = context.colors;
+    final text = context.text;
+    return SizedBox(
+      width: 104,
+      child: AppCard(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.md + 2,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            SizedBox.square(
+              dimension: 62,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  SizedBox.expand(
+                    child: CircularProgressIndicator(
+                      value: (score / 100).clamp(0.0, 1.0),
+                      strokeWidth: 6,
+                      backgroundColor: c.border,
+                      color: c.primary,
+                    ),
+                  ),
+                  Text(
+                    '$score',
+                    style: text.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              children: [
+                Text('Last score', style: text.labelMedium),
+                Text(
+                  'Layout',
+                  style: text.labelSmall?.copyWith(color: c.textMuted),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -661,8 +894,8 @@ class _ProjectGrid extends StatelessWidget {
       tabletColumns: 3,
       desktopColumns: 4,
       childAspectRatio: context.responsive(
-        mobile: 0.74,
-        tablet: 0.95,
+        mobile: 0.8,
+        tablet: 1.0,
         desktop: 1.05,
       ),
       children: [
@@ -744,131 +977,97 @@ class _ProjectCard extends StatelessWidget {
 
     return AppCard(
       padding: EdgeInsets.zero,
+      radius: AppRadius.mdAll,
       onTap: onTap,
       child: ClipRRect(
-        borderRadius: AppRadius.lgAll,
-        child: Stack(
-          fit: StackFit.expand,
+        borderRadius: AppRadius.mdAll,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (imageUrl != null)
-              Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => sketch(),
-              )
-            else
-              sketch(),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, c.scrim],
-                  stops: const [0.4, 1],
-                ),
-              ),
-            ),
-            Positioned(
-              top: AppSpacing.sm,
-              left: AppSpacing.sm,
-              right: AppSpacing.sm,
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: ProjectStageChip(stage: summary.stage),
-              ),
-            ),
-            Positioned(
-              left: AppSpacing.sm,
-              right: AppSpacing.sm,
-              bottom: AppSpacing.sm,
-              child: AppCard(
-                glass: true,
-                radius: AppRadius.smAll,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.sm,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            project.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: text.titleSmall,
-                          ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  summary.stage.nextStep,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: text.labelSmall?.copyWith(
-                                    color: c.primary,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 2),
-                              Icon(
-                                Icons.arrow_forward_rounded,
-                                size: 12,
-                                color: c.primary,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.schedule_rounded,
-                                size: 12,
-                                color: c.textSecondary,
-                              ),
-                              const SizedBox(width: AppSpacing.xs),
-                              Flexible(
-                                child: Text(
-                                  project.dateLabel,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: text.labelSmall?.copyWith(
-                                    color: c.textSecondary,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (imageUrl != null)
+                    Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => sketch(),
+                    )
+                  else
+                    sketch(),
+                  Positioned(
+                    top: AppSpacing.sm,
+                    left: AppSpacing.sm,
+                    right: AppSpacing.sm,
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: ProjectStageChip(stage: summary.stage),
                     ),
-                    if (score != null) ...[
-                      const SizedBox(width: AppSpacing.sm),
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '$score',
-                            style: text.titleMedium?.copyWith(
-                              color: _scoreStatus(score).colorIn(c),
-                            ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.sm + 2,
+                AppSpacing.md,
+                AppSpacing.md,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          project.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: text.titleSmall,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          summary.stage.nextStep,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: text.labelSmall?.copyWith(color: c.primary),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          project.dateLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: text.labelSmall?.copyWith(
+                            color: c.textMuted,
+                            fontWeight: FontWeight.w500,
                           ),
-                          Text(
-                            '/100',
-                            style: text.labelSmall?.copyWith(
-                              color: c.textMuted,
-                            ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (score != null) ...[
+                    const SizedBox(width: AppSpacing.sm),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '$score',
+                          style: text.titleMedium?.copyWith(
+                            color: _scoreStatus(score).colorIn(c),
+                            fontWeight: FontWeight.w700,
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+                        Text(
+                          '/100',
+                          style: text.labelSmall?.copyWith(color: c.textMuted),
+                        ),
+                      ],
+                    ),
                   ],
-                ),
+                ],
               ),
             ),
           ],
@@ -889,7 +1088,7 @@ class _TipCard extends StatelessWidget {
     final c = context.colors;
     final icon = Icon(
       Icons.lightbulb_outline_rounded,
-      color: c.warning,
+      color: c.primary,
       size: vertical ? 28 : 22,
     );
     final message = Text(
@@ -899,7 +1098,6 @@ class _TipCard extends StatelessWidget {
 
     return AppCard(
       padding: const EdgeInsets.all(AppSpacing.xl),
-      borderColor: c.primary.withValues(alpha: 0.2),
       child: vertical
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1007,4 +1205,32 @@ Widget projectCardForTest(
   ),
   planIndex: 0,
   onTap: onTap ?? () {},
+);
+
+List<_ProjectView> _previewViews(List<ProjectSummary> summaries) => [
+  for (final summary in summaries)
+    _ProjectView(summary: summary, accent: const Color(0xFFC9AE86)),
+];
+
+/// Home for [profile] with these projects, without the database.
+@visibleForTesting
+Widget dashboardPreviewForTest({
+  required AppUserProfile profile,
+  required List<ProjectSummary> summaries,
+}) => Builder(
+  builder: (context) => _TabScaffold(
+    selectedIndex: 0,
+    body: _DashboardContent(
+      size: context.screenSize,
+      profile: profile,
+      isAdmin: false,
+      projects: _previewViews(summaries),
+      onSeeAll: () {},
+      onUpload: () {},
+      onViewDesigns: () {},
+      onAvatarTap: () {},
+      onProjectTap: (_) {},
+      onAdminTap: () {},
+    ),
+  ),
 );

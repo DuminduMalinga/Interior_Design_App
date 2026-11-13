@@ -52,5 +52,4 @@ wall_detector/best.pt
 wall_detector/__pycache__/
 *.detection.json
 
-# Screenshots: only the few referenced in the README are tracked (force-added)
-docs/screenshots/
+# README screenshots (docs/screenshots) are tracked; tool/readme_screenshots_test.dart regenerates them

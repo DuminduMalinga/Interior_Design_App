@@ -68,6 +68,9 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
   /// above the toolbar; on a wider screen it is always beside the room.
   bool _detailsOpen = false;
 
+  /// Phone tabs: 0 = Pieces, 1 = Room details.
+  int _tab = 0;
+
   void _resetView() => setState(() {
     _yaw = _startYaw;
     _zoom = _startZoom;
@@ -218,7 +221,7 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
     final c = context.colors;
     final room = widget.room;
     final layout = widget.layout;
-    final roomColor = room.colorIn(c);
+    final roomColor = c.primary;
     final wide = !context.screenSize.isMobile;
     final analysis = layout.analysis;
     AnalysisFurniture? picked;
@@ -240,54 +243,52 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
       360.0,
     );
     final overlay = !wide && details != null && _detailsOpen;
-    final viewer = Stack(
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onScaleStart: (details) {
-              _yawStart = _yaw;
-              _zoomStart = _zoom;
-              _dragStart = details.focalPoint;
-            },
-            onScaleUpdate: (details) {
-              setState(() {
-                final dragged = details.focalPoint.dx - _dragStart.dx;
-                _yaw = _freeOrbit
-                    // about a full turn for a swipe across a phone
-                    ? wrapAngle(_yawStart + dragged * .0075)
-                    : (_yawStart + dragged * .0025).clamp(_minYaw, _maxYaw);
-                if (details.scale != 1.0) {
-                  _zoom = (_zoomStart * details.scale).clamp(
-                    _minZoom,
-                    _maxZoom,
-                  );
-                }
-              });
-            },
-            child: RepaintBoundary(
-              key: _pictureKey,
-              child: AppBackground(
-                child: CustomPaint(
-                  painter: _IsoRoomPainter(
-                    accent: roomColor,
-                    floor: c.surface,
-                    grid: c.glassFill,
-                    variant: layout.variant,
-                    yaw: _yaw,
-                    zoom: _zoom,
-                    placedFurniture: layout.furniture,
-                    analysis: layout.analysis,
-                    highlight: picked,
-                    highlightColor: c.warning,
-                    bottomInset: overlay ? panelHeight + 96 : 0,
-                  ),
-                  size: Size.infinite,
-                ),
+    final scene = Positioned.fill(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onScaleStart: (details) {
+          _yawStart = _yaw;
+          _zoomStart = _zoom;
+          _dragStart = details.focalPoint;
+        },
+        onScaleUpdate: (details) {
+          setState(() {
+            final dragged = details.focalPoint.dx - _dragStart.dx;
+            _yaw = _freeOrbit
+                // about a full turn for a swipe across a phone
+                ? wrapAngle(_yawStart + dragged * .0075)
+                : (_yawStart + dragged * .0025).clamp(_minYaw, _maxYaw);
+            if (details.scale != 1.0) {
+              _zoom = (_zoomStart * details.scale).clamp(_minZoom, _maxZoom);
+            }
+          });
+        },
+        child: RepaintBoundary(
+          key: _pictureKey,
+          child: AppBackground(
+            child: CustomPaint(
+              painter: _IsoRoomPainter(
+                accent: roomColor,
+                floor: c.surface,
+                grid: c.glassFill,
+                variant: layout.variant,
+                yaw: _yaw,
+                zoom: _zoom,
+                placedFurniture: layout.furniture,
+                analysis: layout.analysis,
+                highlight: picked,
+                highlightColor: c.accent,
+                bottomInset: overlay ? panelHeight + 96 : 0,
               ),
+              size: Size.infinite,
             ),
           ),
         ),
+      ),
+    );
+    final viewer = Stack(
+      children: [
+        scene,
         Positioned(
           top: AppSpacing.xs,
           left: AppSpacing.md,
@@ -297,14 +298,10 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
           ),
         ),
         Positioned(
-          top: AppSpacing.xs,
-          // clear of the close button, and the same on both sides so the
-          // title stays centred
-          left: 72,
-          right: 72,
-          child: Center(
-            child: _TitlePill(room: room, layout: layout),
-          ),
+          top: 64,
+          left: AppSpacing.xl - 4,
+          right: 84,
+          child: _TitleBlock(room: room, layout: layout),
         ),
         Positioned(
           right: AppSpacing.md,
@@ -326,9 +323,9 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
           ),
         ),
         Positioned(
-          left: AppSpacing.lg,
-          right: AppSpacing.lg,
-          bottom: AppSpacing.md,
+          left: AppSpacing.xl - 4,
+          right: AppSpacing.xl - 4,
+          bottom: AppSpacing.lg,
           // Keeps the toolbar a sensible width on tablet and desktop.
           child: Center(
             child: ConstrainedBox(
@@ -357,9 +354,9 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
                 constraints: const BoxConstraints(maxWidth: 480),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: c.backgroundElevated.withValues(alpha: 0.96),
+                    color: c.surface,
                     borderRadius: AppRadius.xlAll,
-                    border: Border.all(color: c.glassBorder),
+                    border: Border.all(color: c.border),
                   ),
                   child: ClipRRect(
                     borderRadius: AppRadius.xlAll,
@@ -371,6 +368,15 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
           ),
       ],
     );
+    if (!wide) {
+      return _phone(
+        context,
+        scene: scene,
+        picked: picked,
+        analysis: analysis,
+        colors: c,
+      );
+    }
     return Scaffold(
       body: SafeArea(
         child: wide && details != null
@@ -390,6 +396,267 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
                 ],
               )
             : viewer,
+      ),
+    );
+  }
+
+  /// Phone: the room on top, then a turn slider, tabs for its pieces and
+  /// details, and the save / share buttons.
+  Widget _phone(
+    BuildContext context, {
+    required Widget scene,
+    required AnalysisFurniture? picked,
+    required AnalysisLayout? analysis,
+    required AppColors colors,
+  }) {
+    final c = colors;
+    final text = context.text;
+    final room = widget.room;
+    final layout = widget.layout;
+    final height = MediaQuery.sizeOf(context).height;
+    final sceneHeight = (height * .44).clamp(240.0, 420.0);
+    final lo = _freeOrbit ? -math.pi : _minYaw;
+    final hi = _freeOrbit ? math.pi : _maxYaw;
+
+    Widget tab(int i, String label) {
+      final on = _tab == i;
+      return Material(
+        color: on ? c.surfaceElevated : Colors.transparent,
+        shape: StadiumBorder(side: BorderSide(color: on ? c.border : c.border)),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: () => setState(() => _tab = i),
+          child: SizedBox(
+            height: 40,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg + 2,
+              ),
+              child: Center(
+                child: Text(
+                  label,
+                  style: text.labelMedium?.copyWith(
+                    color: on ? c.textPrimary : c.textMuted,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            SizedBox(
+              height: sceneHeight,
+              child: Stack(
+                children: [
+                  scene,
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: 48,
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              c.background.withValues(alpha: 0),
+                              c.background,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: AppSpacing.sm,
+                    left: AppSpacing.xl - 4,
+                    right: AppSpacing.xl - 4,
+                    child: Row(
+                      children: [
+                        AppRoundButton(
+                          icon: Icons.arrow_back_rounded,
+                          tooltip: 'Back',
+                          overImage: true,
+                          onPressed: () => Navigator.of(context).maybePop(),
+                        ),
+                        const Spacer(),
+                        Builder(
+                          builder: (context) => AppRoundButton(
+                            icon: Icons.ios_share_rounded,
+                            tooltip: 'Share room',
+                            overImage: true,
+                            onPressed: _exporting
+                                ? null
+                                : () {
+                                    final box = context.findRenderObject();
+                                    _share(
+                                      box is RenderBox && box.hasSize
+                                          ? box.localToGlobal(Offset.zero) &
+                                                box.size
+                                          : null,
+                                    );
+                                  },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    top: 64,
+                    left: AppSpacing.xl - 4,
+                    width: 190,
+                    child: _TitleBlock(room: room, layout: layout),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xl - 4,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: c.surface,
+                              borderRadius: AppRadius.fullAll,
+                              border: Border.all(color: c.border),
+                            ),
+                            child: SizedBox(
+                              height: 52,
+                              child: Row(
+                                children: [
+                                  IconButton(
+                                    onPressed: () =>
+                                        _turn(_freeOrbit ? -math.pi / 8 : -.16),
+                                    tooltip: 'Turn left',
+                                    icon: Icon(
+                                      Icons.rotate_left_rounded,
+                                      size: 18,
+                                      color: c.textMuted,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Slider(
+                                      min: lo,
+                                      max: hi,
+                                      value: _yaw.clamp(lo, hi),
+                                      semanticFormatterCallback: (_) =>
+                                          'Turn the room',
+                                      onChanged: (v) =>
+                                          setState(() => _yaw = v),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    onPressed: () =>
+                                        _turn(_freeOrbit ? math.pi / 8 : .16),
+                                    tooltip: 'Turn right',
+                                    icon: Icon(
+                                      Icons.rotate_right_rounded,
+                                      size: 18,
+                                      color: c.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm + 2),
+                        AppRoundButton(
+                          icon: Icons.zoom_in_rounded,
+                          tooltip: 'Zoom in',
+                          onPressed: () => setState(
+                            () =>
+                                _zoom = (_zoom + .12).clamp(_minZoom, _maxZoom),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm + 2),
+                        AppRoundButton(
+                          icon: Icons.restart_alt_rounded,
+                          tooltip: 'Reset view',
+                          onPressed: _resetView,
+                        ),
+                      ],
+                    ),
+                    if (analysis != null) ...[
+                      const SizedBox(height: AppSpacing.lg),
+                      Row(
+                        children: [
+                          tab(0, 'Pieces'),
+                          const SizedBox(width: AppSpacing.sm),
+                          tab(1, 'Room details'),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      if (_tab == 0)
+                        RoomPiecesTab(
+                          layout: analysis,
+                          selectedId: _selectedId,
+                          onSelect: (id) => setState(() => _selectedId = id),
+                        )
+                      else
+                        RoomFactsTab(layout: analysis),
+                    ],
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.xl - 4,
+                AppSpacing.sm,
+                AppSpacing.xl - 4,
+                AppSpacing.lg,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _ToolbarAction(
+                      icon: Icons.image_outlined,
+                      label: 'Export',
+                      busy: _exporting,
+                      onTap: _export,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm + 2),
+                  Expanded(
+                    child: Builder(
+                      builder: (context) => _ToolbarAction(
+                        icon: Icons.view_in_ar_outlined,
+                        label: 'Share',
+                        busy: _exporting,
+                        accent: c.primary,
+                        onTap: () {
+                          final box = context.findRenderObject();
+                          _share(
+                            box is RenderBox && box.hasSize
+                                ? box.localToGlobal(Offset.zero) & box.size
+                                : null,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -431,8 +698,9 @@ class _GlassIconButton extends StatelessWidget {
   }
 }
 
-class _TitlePill extends StatelessWidget {
-  const _TitlePill({required this.room, required this.layout});
+/// The room's name, with the chosen layout and its score beneath.
+class _TitleBlock extends StatelessWidget {
+  const _TitleBlock({required this.room, required this.layout});
 
   final _DetectedRoom room;
   final _LayoutOption layout;
@@ -440,31 +708,38 @@ class _TitlePill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.sm,
-      ),
-      decoration: BoxDecoration(
-        color: c.backgroundElevated.withValues(alpha: 0.6),
-        borderRadius: AppRadius.fullAll,
-        border: Border.all(color: c.glassBorder),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(room.icon, size: 14, color: room.colorIn(c)),
-          const SizedBox(width: AppSpacing.sm - 2),
-          Flexible(
-            child: Text(
-              '${layout.title} · ${room.name}',
-              style: context.text.labelMedium,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+    final text = context.text;
+    final analysis = layout.analysis;
+    // a soft halo keeps the words readable over the room drawing
+    final shadow = [
+      Shadow(color: c.background.withValues(alpha: .9), blurRadius: 10),
+      Shadow(color: c.background.withValues(alpha: .9), blurRadius: 4),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          room.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: text.headlineSmall?.copyWith(shadows: shadow),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          [
+            layout.title,
+            'Score ${layout.matchScore}',
+            if (analysis != null)
+              analysis.valid ? 'Valid layout' : 'Compromised',
+          ].join(' · '),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: text.bodySmall?.copyWith(
+            color: c.textPrimary,
+            shadows: shadow,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -541,31 +816,19 @@ class _ViewerToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-      decoration: BoxDecoration(
-        color: c.backgroundElevated.withValues(alpha: 0.9),
-        borderRadius: AppRadius.xlAll,
-        border: Border.all(color: c.glassBorder),
-        boxShadow: [
-          BoxShadow(
-            color: accent.withValues(alpha: .18),
-            blurRadius: 26,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _ToolbarAction(
+    return Row(
+      children: [
+        Expanded(
+          child: _ToolbarAction(
             icon: Icons.download_rounded,
             label: 'Export',
             busy: busy,
             onTap: onExport,
           ),
-          Builder(
+        ),
+        const SizedBox(width: AppSpacing.sm + 2),
+        Expanded(
+          child: Builder(
             builder: (context) => _ToolbarAction(
               icon: Icons.share_rounded,
               label: 'Share',
@@ -580,8 +843,11 @@ class _ViewerToolbar extends StatelessWidget {
               },
             ),
           ),
-          if (onDetails != null)
-            _ToolbarAction(
+        ),
+        if (onDetails != null) ...[
+          const SizedBox(width: AppSpacing.sm + 2),
+          Expanded(
+            child: _ToolbarAction(
               icon: detailsOpen
                   ? Icons.keyboard_arrow_down_rounded
                   : Icons.info_outline_rounded,
@@ -589,8 +855,9 @@ class _ViewerToolbar extends StatelessWidget {
               accent: accent,
               onTap: onDetails!,
             ),
+          ),
         ],
-      ),
+      ],
     );
   }
 }
@@ -614,31 +881,28 @@ class _ToolbarAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = accent ?? context.colors.textPrimary;
+    final c = context.colors;
+    final gold = accent != null;
+    final base = gold ? c.onPrimary : c.textPrimary;
+    final color = busy ? base.withValues(alpha: 0.4) : base;
     return Material(
-      type: MaterialType.transparency,
+      color: gold ? c.primary : c.surface,
+      shape: StadiumBorder(
+        side: BorderSide(color: gold ? c.primary : c.border),
+      ),
       child: InkWell(
+        customBorder: const StadiumBorder(),
         onTap: busy ? null : onTap,
-        borderRadius: AppRadius.smAll,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.sm - 2,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+        child: SizedBox(
+          height: 54,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: 20,
-                color: busy ? color.withValues(alpha: 0.4) : color,
-              ),
-              const SizedBox(height: AppSpacing.xs),
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: AppSpacing.sm),
               Text(
                 label,
-                style: context.text.labelSmall?.copyWith(
-                  color: busy ? color.withValues(alpha: 0.4) : color,
-                ),
+                style: context.text.labelLarge?.copyWith(color: color),
               ),
             ],
           ),

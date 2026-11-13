@@ -73,7 +73,11 @@ class AboutScreen extends StatelessWidget {
     final text = context.text;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('About LiviSpace')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        leadingWidth: AppBackButton.width,
+        title: const Text('About LiviSpace'),
+      ),
       body: DecoratedBox(
         decoration: BoxDecoration(gradient: c.backgroundGradient),
         child: SafeArea(
@@ -312,7 +316,11 @@ class HelpScreen extends StatelessWidget {
     final text = context.text;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Help & support')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        leadingWidth: AppBackButton.width,
+        title: const Text('Help & support'),
+      ),
       body: DecoratedBox(
         decoration: BoxDecoration(gradient: c.backgroundGradient),
         child: SafeArea(

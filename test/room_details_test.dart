@@ -329,37 +329,35 @@ void main() {
       size,
     );
 
-    testWidgets('a phone opens the details over the room, and hides them', (
-      tester,
-    ) async {
+    testWidgets('a phone has Pieces and Room details tabs', (tester) async {
       await open(tester, size: _sizes['mobile']!);
+      expect(find.text('Pieces'), findsOneWidget);
+      expect(find.text('Double bed'), findsOneWidget);
       expect(find.text('Layout score'), findsNothing);
-      expect(find.text('Details'), findsOneWidget);
 
-      await tester.tap(find.text('Details'));
+      await tester.tap(find.text('Room details'));
       await tester.pumpAndSettle();
       expect(find.text('Layout score'), findsOneWidget);
-      expect(find.text('In this room'), findsOneWidget);
-      expect(find.text('Hide'), findsOneWidget);
+      expect(find.text('Status'), findsOneWidget);
+      expect(find.text('Double bed'), findsNothing);
 
-      await tester.tap(find.text('Hide'));
+      await tester.tap(find.text('Pieces').first);
       await tester.pumpAndSettle();
       expect(find.text('Layout score'), findsNothing);
-      expect(find.text('Details'), findsOneWidget);
+      expect(find.text('Double bed'), findsOneWidget);
     });
 
-    testWidgets('a phone can pick a piece and come back to the list', (
+    testWidgets('a phone picks a piece and says why it is there', (
       tester,
     ) async {
       await open(tester, size: _sizes['mobile']!);
-      await tester.tap(find.text('Details'));
-      await tester.pumpAndSettle();
       await tester.tap(find.text('Double bed'));
       await tester.pumpAndSettle();
-      expect(find.text('Why it is here'), findsOneWidget);
-      await tester.tap(find.text('All pieces'));
-      await tester.pumpAndSettle();
-      expect(find.text('In this room'), findsOneWidget);
+      expect(find.text('Outlined in the room'), findsOneWidget);
+      expect(
+        find.textContaining('The headboard is against the west wall.'),
+        findsOneWidget,
+      );
     });
 
     for (final name in ['tablet', 'desktop']) {
@@ -478,9 +476,9 @@ void main() {
       testWidgets('draws without overflow on a $name screen', (tester) async {
         await open(tester, size: size);
         if (name == 'mobile') {
-          await tester.tap(find.text('Details'));
-          await tester.pumpAndSettle();
           await tester.tap(find.text('Double bed'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Room details'));
           await tester.pumpAndSettle();
         }
         expect(tester.takeException(), isNull);

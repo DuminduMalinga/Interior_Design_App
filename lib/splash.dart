@@ -65,6 +65,14 @@ class _SplashScreenState extends State<SplashScreen> {
                     tablet: text.headlineLarge,
                   ),
                 ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'BETTER LIVING',
+                  style: text.labelSmall?.copyWith(
+                    color: c.primary,
+                    letterSpacing: 3,
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   'Design spaces for better living',

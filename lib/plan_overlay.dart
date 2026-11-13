@@ -284,7 +284,7 @@ class PlanOverlayPainter extends CustomPainter {
       ),
     );
     canvas.drawRRect(
-      RRect.fromRectAndRadius(inside, const Radius.circular(10)),
+      RRect.fromRectAndRadius(inside, const Radius.circular(12)),
       Paint()..color = colors.primary.withValues(alpha: 0.92),
     );
     painter.paint(canvas, inside.topLeft + const Offset(8, 5));

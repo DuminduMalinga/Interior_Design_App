@@ -232,9 +232,9 @@ class _AuthScreenState extends State<AuthScreen> {
           OutlinedButton.icon(
             onPressed: () => _signInWithGoogle(context),
             style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-              backgroundColor: c.glassFill,
-              side: BorderSide(color: c.glassBorder),
+              minimumSize: const Size.fromHeight(56),
+              backgroundColor: c.surface,
+              side: BorderSide(color: c.border),
             ),
             icon: const AppGoogleMark(),
             label: const Text('Continue with Google'),
@@ -442,28 +442,6 @@ class _AuthBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(gradient: c.backgroundGradient),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-            center: const Alignment(-.6, -.9),
-            radius: 1.1,
-            colors: [c.secondary.withValues(alpha: 0.16), Colors.transparent],
-          ),
-        ),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: RadialGradient(
-              center: const Alignment(.9, .8),
-              radius: 1.2,
-              colors: [c.primary.withValues(alpha: 0.14), Colors.transparent],
-            ),
-          ),
-        ),
-      ),
-    );
+    return ColoredBox(color: context.colors.background);
   }
 }

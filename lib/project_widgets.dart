@@ -76,6 +76,7 @@ class _Stat extends StatelessWidget {
     final text = context.text;
 
     return AppCard(
+      radius: AppRadius.mdAll,
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,7 +92,7 @@ class _Stat extends StatelessWidget {
                   ),
               ],
             ),
-            style: text.titleLarge,
+            style: text.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(

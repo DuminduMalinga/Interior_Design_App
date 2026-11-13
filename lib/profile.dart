@@ -3,7 +3,16 @@ part of 'main.dart';
 /// The signed-in user's profile: identity, usage stats, account settings,
 /// and sign out.
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key}) : _preview = null;
+
+  /// Shows [profile] and its totals as if they had just loaded.
+  // ignore: prefer_const_constructors_in_immutables
+  ProfileScreen._preview(
+    AppUserProfile profile,
+    ({int projects, int rooms}) stats,
+  ) : _preview = (profile, stats);
+
+  final (AppUserProfile, ({int projects, int rooms}))? _preview;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -33,6 +42,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isAdmin = false;
   ({int projects, int rooms})? _stats;
   bool _avatarBusy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final preview = widget._preview;
+    if (preview != null) {
+      _profile = preview.$1;
+      _prefs = preview.$1.notifications;
+      _stats = preview.$2;
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -363,7 +383,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return _TabScaffold(
       selectedIndex: 4,
-      appBar: AppBar(title: const Text('Profile')),
       body: RefreshIndicator(
         onRefresh: _load,
         child: SingleChildScrollView(
@@ -378,6 +397,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            const AppTabHeader(title: 'Profile'),
+                            const SizedBox(height: AppSpacing.lg),
                             header,
                             const SizedBox(height: AppSpacing.xl),
                             statsRow,
@@ -391,6 +412,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      const AppTabHeader(title: 'Profile'),
+                      const SizedBox(height: AppSpacing.lg),
                       header,
                       const SizedBox(height: AppSpacing.xl),
                       statsRow,
@@ -867,3 +890,11 @@ class _SettingsTile extends StatelessWidget {
     );
   }
 }
+
+/// The profile tab for [profile], without the database.
+@visibleForTesting
+Widget profilePreviewForTest(
+  AppUserProfile profile, {
+  required int projects,
+  required int rooms,
+}) => ProfileScreen._preview(profile, (projects: projects, rooms: rooms));

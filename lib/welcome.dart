@@ -38,13 +38,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     final text = context.text;
     final wide = !context.screenSize.isMobile;
 
-    final headline = _Headline(centered: !wide);
+    const headline = _Headline(centered: false);
     final description = Text(
-      'AI-powered room detection turns 2D architectural '
-      'blueprints into photorealistic, interactive 3D '
-      'environments in seconds.',
-      textAlign: wide ? TextAlign.start : TextAlign.center,
-      style: text.bodyMedium?.copyWith(color: c.textSecondary),
+      'Upload a floor plan, let AI read your rooms, and choose a layout '
+      'made for the way you live.',
+      style: text.bodyLarge?.copyWith(color: c.textSecondary),
     );
     final hero = AnimatedBuilder(
       animation: _floatController,
@@ -55,103 +53,156 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       child: const _HeroCard(),
     );
     final stats = _WelcomeStats(load: widget.loadStats);
-    final note = Text(
-      'No credit card required • Instant 3D CAD analysis',
-      textAlign: wide ? TextAlign.start : TextAlign.center,
-      style: text.labelSmall?.copyWith(color: c.textMuted),
+    final signInRow = Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          'Already have an account? ',
+          style: text.bodyMedium?.copyWith(color: c.textMuted),
+        ),
+        GestureDetector(
+          onTap: () => _openAuth(context, true),
+          child: Text(
+            'Sign in',
+            style: text.bodyMedium?.copyWith(
+              color: c.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
     );
 
-    return Scaffold(
-      body: Stack(
-        children: [
-          const Positioned.fill(child: _WelcomeBackground()),
-          SafeArea(
-            child: AppContentFrame(
-              verticalPadding: AppSpacing.lg,
-              child: Column(
-                children: [
-                  _WelcomeTopBar(onSignIn: () => _openAuth(context, true)),
-                  const SizedBox(height: AppSpacing.lg),
-                  Expanded(
-                    child: wide
-                        ? Center(
-                            child: SingleChildScrollView(
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const _StatusPill(),
-                                        const SizedBox(height: AppSpacing.lg),
-                                        headline,
-                                        const SizedBox(height: AppSpacing.md),
-                                        description,
-                                        const SizedBox(height: AppSpacing.xl),
-                                        Wrap(
-                                          spacing: AppSpacing.md,
-                                          runSpacing: AppSpacing.md,
-                                          children: [
-                                            AppButton(
-                                              label: 'Get Started',
-                                              icon: Icons.arrow_forward_rounded,
-                                              iconAfterLabel: true,
-                                              expanded: false,
-                                              onPressed: () =>
-                                                  _openAuth(context, false),
-                                            ),
-                                            AppButton(
-                                              label: 'Sign In',
-                                              variant:
-                                                  AppButtonVariant.secondary,
-                                              expanded: false,
-                                              onPressed: () =>
-                                                  _openAuth(context, true),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: AppSpacing.md),
-                                        note,
-                                        const SizedBox(height: AppSpacing.xl),
-                                        stats,
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: AppSpacing.huge),
-                                  Expanded(child: hero),
-                                ],
-                              ),
-                            ),
-                          )
-                        : SingleChildScrollView(
+    if (wide) {
+      return Scaffold(
+        body: SafeArea(
+          child: AppContentFrame(
+            verticalPadding: AppSpacing.lg,
+            child: Column(
+              children: [
+                _WelcomeTopBar(onSignIn: () => _openAuth(context, true)),
+                const SizedBox(height: AppSpacing.lg),
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      child: Row(
+                        children: [
+                          Expanded(
                             child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const _StatusPill(),
-                                const SizedBox(height: AppSpacing.lg),
                                 headline,
                                 const SizedBox(height: AppSpacing.md),
                                 description,
                                 const SizedBox(height: AppSpacing.xl),
-                                hero,
+                                Wrap(
+                                  spacing: AppSpacing.md,
+                                  runSpacing: AppSpacing.md,
+                                  children: [
+                                    AppButton(
+                                      label: 'Get Started',
+                                      icon: Icons.arrow_forward_rounded,
+                                      iconAfterLabel: true,
+                                      expanded: false,
+                                      onPressed: () =>
+                                          _openAuth(context, false),
+                                    ),
+                                    AppButton(
+                                      label: 'Sign In',
+                                      variant: AppButtonVariant.secondary,
+                                      expanded: false,
+                                      onPressed: () => _openAuth(context, true),
+                                    ),
+                                  ],
+                                ),
                                 const SizedBox(height: AppSpacing.xl),
                                 stats,
                               ],
                             ),
                           ),
-                  ),
-                  if (!wide) ...[
-                    const SizedBox(height: AppSpacing.lg),
-                    AppButton(
-                      label: 'Get Started',
-                      icon: Icons.arrow_forward_rounded,
-                      iconAfterLabel: true,
-                      onPressed: () => _openAuth(context, false),
+                          const SizedBox(width: AppSpacing.huge),
+                          Expanded(child: hero),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    note,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Phone: a full-bleed room photo that fades into the page, the headline
+    // low on the screen, and one big call to action.
+    final heroHeight = MediaQuery.sizeOf(context).height * .62;
+    return Scaffold(
+      body: Stack(
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: heroHeight,
+            child: const _HeroImage(),
+          ),
+          Positioned(
+            top: heroHeight * .45,
+            left: 0,
+            right: 0,
+            height: heroHeight * .55 + 40,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    c.background.withValues(alpha: 0),
+                    c.background.withValues(alpha: .85),
+                    c.background,
                   ],
+                  stops: const [0, .6, 1],
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+              child: Column(
+                children: [
+                  const SizedBox(height: AppSpacing.md),
+                  _WelcomeTopBar(onSignIn: () => _openAuth(context, true)),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, box) => SingleChildScrollView(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minHeight: box.maxHeight),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: AppSpacing.huge * 3),
+                              headline,
+                              const SizedBox(height: AppSpacing.md + 2),
+                              description,
+                              const SizedBox(height: AppSpacing.xl),
+                              stats,
+                              const SizedBox(height: AppSpacing.lg),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  _PillCta(
+                    label: 'Get Started',
+                    onPressed: () => _openAuth(context, false),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  signInRow,
+                  const SizedBox(height: AppSpacing.lg),
                 ],
               ),
             ),
@@ -183,31 +234,98 @@ class _WelcomeTopBar extends StatelessWidget {
 
     return Row(
       children: [
-        const AppLogoMark(size: 32),
-        const SizedBox(width: AppSpacing.sm + 1),
-        Text('LiviSpace', style: text.titleMedium),
-        const SizedBox(width: AppSpacing.sm),
-        AppStatusChip(label: 'AI 3D', color: c.secondary),
-        const Spacer(),
-        TextButton(
-          onPressed: onSignIn,
-          style: TextButton.styleFrom(foregroundColor: c.textPrimary),
-          child: const Text('Sign In'),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: c.background.withValues(alpha: .55),
+            borderRadius: AppRadius.smAll,
+            border: Border.all(color: c.textPrimary.withValues(alpha: .25)),
+          ),
+          child: const SizedBox.square(
+            dimension: 40,
+            child: Center(child: AppLogoMark(size: 24)),
+          ),
         ),
+        const SizedBox(width: AppSpacing.md - 2),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('LiviSpace', style: text.titleMedium),
+            Text(
+              'BETTER LIVING',
+              style: text.labelSmall?.copyWith(
+                color: c.textSecondary,
+                letterSpacing: 2,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+        const Spacer(),
+        if (!context.screenSize.isMobile)
+          TextButton(
+            onPressed: onSignIn,
+            style: TextButton.styleFrom(foregroundColor: c.textPrimary),
+            child: const Text('Sign In'),
+          ),
       ],
     );
   }
 }
 
-class _StatusPill extends StatelessWidget {
-  const _StatusPill();
+/// The landing screen's call to action: a gold pill whose arrow sits in a
+/// dark circle at its right edge.
+class _PillCta extends StatelessWidget {
+  const _PillCta({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return const AppStatusChip(
-      label: 'Next-Gen Spatial Intelligence',
-      status: AppStatus.info,
-      icon: Icons.hub_rounded,
+    final c = context.colors;
+    return Semantics(
+      button: true,
+      label: label,
+      child: Material(
+        color: c.primary,
+        borderRadius: AppRadius.fullAll,
+        child: InkWell(
+          borderRadius: AppRadius.fullAll,
+          onTap: onPressed,
+          child: SizedBox(
+            height: 60,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(26, 0, AppSpacing.sm, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: context.text.titleMedium?.copyWith(
+                        color: c.onPrimary,
+                      ),
+                    ),
+                  ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: c.onPrimary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: SizedBox.square(
+                      dimension: 44,
+                      child: Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 18,
+                        color: c.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -220,30 +338,14 @@ class _Headline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = context.responsive(
-      mobile: context.text.headlineMedium,
+      mobile: context.text.displayMedium,
       tablet: context.text.displayMedium,
       desktop: context.text.displayLarge,
     );
-    final align = centered ? TextAlign.center : TextAlign.start;
-
-    return Column(
-      crossAxisAlignment: centered
-          ? CrossAxisAlignment.center
-          : CrossAxisAlignment.start,
-      children: [
-        Text('Transform Floor Plans into', textAlign: align, style: style),
-        ShaderMask(
-          shaderCallback: (bounds) =>
-              context.colors.brandGradient.createShader(bounds),
-          // The text colour is replaced by the gradient; it only has to be
-          // opaque for the mask to show through.
-          child: Text(
-            'Stunning 3D Spaces',
-            textAlign: align,
-            style: style?.copyWith(color: Colors.white),
-          ),
-        ),
-      ],
+    return Text(
+      'Design spaces\nfor better living',
+      textAlign: centered ? TextAlign.center : TextAlign.start,
+      style: style,
     );
   }
 }
@@ -353,28 +455,27 @@ class _StatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final text = context.text;
-    final color = accent.resolve(c);
 
     return AppCard(
-      borderColor: color.withValues(alpha: 0.22),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md + 2,
+        vertical: AppSpacing.md,
+      ),
+      radius: AppRadius.mdAll,
       child: Row(
         children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.16),
-              borderRadius: AppRadius.smAll,
-            ),
-            child: SizedBox.square(
-              dimension: 36,
-              child: Icon(icon, color: color, size: 18),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
+          Icon(icon, color: c.primary, size: 18),
+          const SizedBox(width: AppSpacing.md - 2),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(value, style: text.titleMedium),
+                Text(
+                  value,
+                  style: text.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 Text(
                   label,
                   maxLines: 2,
@@ -409,42 +510,14 @@ class _HeroCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: c.backgroundElevated,
                 borderRadius: AppRadius.xlAll,
-                border: Border.all(color: c.primary.withValues(alpha: 0.22)),
-                boxShadow: [
-                  BoxShadow(
-                    color: c.primary.withValues(alpha: 0.12),
-                    blurRadius: 40,
-                    spreadRadius: 2,
-                  ),
-                ],
+                border: Border.all(color: c.border),
               ),
               child: ClipRRect(
                 borderRadius: AppRadius.xlAll,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Image.network(
-                      'https://images.unsplash.com/photo-1618219908412-a29a1bb7b86e'
-                      '?auto=format&fit=crop&w=1000&q=80',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          CustomPaint(painter: _WelcomeHeroPainter(colors: c)),
-                      loadingBuilder: (context, child, progress) {
-                        if (progress == null) return child;
-                        return ColoredBox(
-                          color: c.backgroundElevated,
-                          child: Center(
-                            child: SizedBox.square(
-                              dimension: 26,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.4,
-                                color: c.primary,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                    const _HeroImage(),
                     DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -465,7 +538,7 @@ class _HeroCard extends StatelessWidget {
             left: AppSpacing.sm,
             child: _HeroBadge(
               icon: Icons.diamond_outlined,
-              label: '3D Mesh: Detected',
+              label: 'Rooms detected',
             ),
           ),
           const Positioned(
@@ -473,7 +546,7 @@ class _HeroCard extends StatelessWidget {
             right: AppSpacing.sm,
             child: _HeroBadge(
               icon: Icons.auto_awesome_rounded,
-              label: '60 FPS ISOMETRIC',
+              label: 'Live 3D',
             ),
           ),
           const Positioned(
@@ -483,12 +556,46 @@ class _HeroCard extends StatelessWidget {
             child: Center(
               child: _HeroBadge(
                 icon: Icons.layers_outlined,
-                label: 'Neural Spatial Engine',
+                label: 'AI layouts',
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The room photo, with the isometric drawing as its offline fallback.
+class _HeroImage extends StatelessWidget {
+  const _HeroImage();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Image.network(
+      'https://images.unsplash.com/photo-1618219908412-a29a1bb7b86e'
+      '?auto=format&fit=crop&w=1000&q=80',
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => ColoredBox(
+        color: c.surface,
+        child: CustomPaint(painter: _WelcomeHeroPainter(colors: c)),
+      ),
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return ColoredBox(
+          color: c.surface,
+          child: Center(
+            child: SizedBox.square(
+              dimension: 26,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.4,
+                color: c.primary,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -718,35 +825,4 @@ class _WelcomeHeroPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _WelcomeHeroPainter oldDelegate) =>
       oldDelegate.colors != colors;
-}
-
-class _WelcomeBackground extends StatelessWidget {
-  const _WelcomeBackground();
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(gradient: c.backgroundGradient),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-            center: const Alignment(-.7, -1),
-            radius: 1.15,
-            colors: [c.secondary.withValues(alpha: 0.18), Colors.transparent],
-          ),
-        ),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: RadialGradient(
-              center: const Alignment(.9, .9),
-              radius: 1.2,
-              colors: [c.primary.withValues(alpha: 0.16), Colors.transparent],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 /// reports overflows that never happen. Loading the Roboto that ships with
 /// the SDK gives realistic text metrics.
 Future<void> loadRoboto() async {
+  await _loadAppFont();
   // The test runner lives under <sdk>/bin/cache/, which locates the SDK even
   // when FLUTTER_ROOT is not set.
   final exe = Platform.resolvedExecutable.replaceAll(r'\', '/');
@@ -29,5 +30,14 @@ Future<void> loadRoboto() async {
       );
     }
   }
+  await loader.load();
+}
+
+/// The app's own typeface, bundled in assets/fonts.
+Future<void> _loadAppFont() async {
+  final file = File('assets/fonts/PlusJakartaSans.ttf');
+  if (!file.existsSync()) return;
+  final loader = FontLoader('PlusJakartaSans')
+    ..addFont(Future.value(ByteData.sublistView(file.readAsBytesSync())));
   await loader.load();
 }

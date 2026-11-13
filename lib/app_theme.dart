@@ -19,8 +19,8 @@ abstract final class AppSpacing {
 abstract final class AppRadius {
   static const double sm = 12;
   static const double md = 16;
-  static const double lg = 20;
-  static const double xl = 28;
+  static const double lg = 22;
+  static const double xl = 30;
   static const double full = 999;
 
   static const BorderRadius smAll = BorderRadius.all(Radius.circular(sm));
@@ -54,7 +54,7 @@ abstract final class AppElevation {
 /// Soft, wide shadows for custom-decorated surfaces.
 abstract final class AppShadows {
   static const List<BoxShadow> soft = [
-    BoxShadow(color: Color(0x29000000), blurRadius: 18, offset: Offset(0, 8)),
+    BoxShadow(color: Color(0x1F000000), blurRadius: 12, offset: Offset(0, 4)),
   ];
 
   static const List<BoxShadow> medium = [
@@ -99,33 +99,33 @@ class AppColors extends ThemeExtension<AppColors> {
   });
 
   static const AppColors dark = AppColors(
-    background: Color(0xFF060A14),
-    backgroundElevated: Color(0xFF0B1220),
-    surface: Color(0xFF111A2E),
-    surfaceElevated: Color(0xFF17233D),
-    border: Color(0xFF22304D),
-    primary: Color(0xFF4A82F7),
-    onPrimary: Color(0xFFFFFFFF),
-    secondary: Color(0xFF8B6CFF),
-    accent: Color(0xFF4FD1C5),
-    success: Color(0xFF3DD68C),
-    warning: Color(0xFFF5B95F),
-    error: Color(0xFFFF6B7A),
-    textPrimary: Color(0xFFF4F7FF),
-    textSecondary: Color(0xFFC3CEE8),
-    textMuted: Color(0xFF8592B0),
+    background: Color(0xFF0E0D0C),
+    backgroundElevated: Color(0xFF1A1816),
+    surface: Color(0xFF1A1816),
+    surfaceElevated: Color(0xFF2E2A27),
+    border: Color(0xFF2E2A27),
+    primary: Color(0xFFC9AE86),
+    onPrimary: Color(0xFF1A1612),
+    secondary: Color(0xFF8E7F6E),
+    accent: Color(0xFFE0CBA8),
+    success: Color(0xFFA9C9A0),
+    warning: Color(0xFFE6B877),
+    error: Color(0xFFE8838B),
+    textPrimary: Color(0xFFF3EFE9),
+    textSecondary: Color(0xFFD6CEC3),
+    textMuted: Color(0xFFA8A097),
     glassFill: Color(0x14FFFFFF),
     glassBorder: Color(0x1FFFFFFF),
     scrim: Color(0xB8000000),
     backgroundGradient: LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Color(0xFF0A1226), Color(0xFF060A14), Color(0xFF0B0F24)],
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [Color(0xFF0E0D0C), Color(0xFF0E0D0C)],
     ),
     brandGradient: LinearGradient(
       begin: Alignment.centerLeft,
       end: Alignment.centerRight,
-      colors: [Color(0xFF4A82F7), Color(0xFF8B6CFF)],
+      colors: [Color(0xFFC9AE86), Color(0xFFC9AE86)],
     ),
   );
 
@@ -133,33 +133,33 @@ class AppColors extends ThemeExtension<AppColors> {
   /// Accents are a shade deeper so they keep their contrast on a light
   /// background.
   static const AppColors light = AppColors(
-    background: Color(0xFFF4F7FC),
+    background: Color(0xFFF7F3EC),
     backgroundElevated: Color(0xFFFFFFFF),
     surface: Color(0xFFFFFFFF),
-    surfaceElevated: Color(0xFFEBF0FA),
-    border: Color(0xFFD8E0F0),
-    primary: Color(0xFF2F6BF0),
+    surfaceElevated: Color(0xFFEFE8DC),
+    border: Color(0xFFE2D9CA),
+    primary: Color(0xFF8A6A3C),
     onPrimary: Color(0xFFFFFFFF),
-    secondary: Color(0xFF7352F0),
-    accent: Color(0xFF0E9A8F),
-    success: Color(0xFF1B9A60),
-    warning: Color(0xFFC27B0E),
-    error: Color(0xFFD93A4C),
-    textPrimary: Color(0xFF0F1730),
-    textSecondary: Color(0xFF3E4A66),
-    textMuted: Color(0xFF66728F),
+    secondary: Color(0xFF6E5F51),
+    accent: Color(0xFF7A5C30),
+    success: Color(0xFF3F7A3A),
+    warning: Color(0xFF9A6410),
+    error: Color(0xFFC0392B),
+    textPrimary: Color(0xFF1A1612),
+    textSecondary: Color(0xFF4A423A),
+    textMuted: Color(0xFF6E665D),
     glassFill: Color(0xB3FFFFFF),
-    glassBorder: Color(0x260F1730),
-    scrim: Color(0xB80F1730),
+    glassBorder: Color(0x261A1612),
+    scrim: Color(0xB81A1612),
     backgroundGradient: LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Color(0xFFF8FAFF), Color(0xFFF4F7FC), Color(0xFFEDF1FB)],
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [Color(0xFFF7F3EC), Color(0xFFF7F3EC)],
     ),
     brandGradient: LinearGradient(
       begin: Alignment.centerLeft,
       end: Alignment.centerRight,
-      colors: [Color(0xFF2F6BF0), Color(0xFF7352F0)],
+      colors: [Color(0xFF8A6A3C), Color(0xFF8A6A3C)],
     ),
   );
 
@@ -277,6 +277,9 @@ extension AppThemeContext on BuildContext {
 class AppTheme {
   const AppTheme._();
 
+  /// Bundled in assets/fonts (see pubspec.yaml).
+  static const String fontFamily = 'PlusJakartaSans';
+
   static ThemeData darkTheme() => _build(AppColors.dark, Brightness.dark);
 
   static ThemeData lightTheme() => _build(AppColors.light, Brightness.light);
@@ -289,12 +292,13 @@ class AppTheme {
 
     OutlineInputBorder inputBorder(Color color, [double width = 1]) =>
         OutlineInputBorder(
-          borderRadius: AppRadius.mdAll,
+          borderRadius: AppRadius.xlAll,
           borderSide: BorderSide(color: color, width: width),
         );
 
     return ThemeData(
       useMaterial3: true,
+      fontFamily: fontFamily,
       brightness: brightness,
       scaffoldBackgroundColor: c.background,
       dividerColor: c.border,
@@ -344,24 +348,24 @@ class AppTheme {
         backgroundColor: c.primary,
         foregroundColor: c.onPrimary,
         elevation: AppElevation.elevated,
-        shape: shape(AppRadius.lgAll),
+        shape: shape(AppRadius.fullAll),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: c.primary,
           foregroundColor: c.onPrimary,
-          minimumSize: const Size(0, 52),
+          minimumSize: const Size(0, 56),
           textStyle: text.labelLarge,
-          shape: shape(AppRadius.mdAll),
+          shape: shape(AppRadius.fullAll),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: c.textPrimary,
-          minimumSize: const Size(0, 52),
+          minimumSize: const Size(0, 56),
           textStyle: text.labelLarge,
           side: BorderSide(color: c.border),
-          shape: shape(AppRadius.mdAll),
+          shape: shape(AppRadius.fullAll),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -385,6 +389,21 @@ class AppTheme {
         errorBorder: inputBorder(c.error),
         focusedErrorBorder: inputBorder(c.error, 1.5),
       ),
+      chipTheme: ChipThemeData(
+        backgroundColor: c.surface,
+        selectedColor: c.primary,
+        disabledColor: c.surface,
+        side: BorderSide(color: c.border),
+        shape: const StadiumBorder(),
+        showCheckmark: false,
+        labelStyle: text.labelMedium?.copyWith(color: c.textSecondary),
+        secondaryLabelStyle: text.labelMedium?.copyWith(color: c.onPrimary),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: c.surface,
+        shape: shape(AppRadius.lgAll),
+      ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: c.surfaceElevated,
@@ -401,19 +420,19 @@ class AppTheme {
       displayLarge: TextStyle(
         fontSize: 44,
         height: 1.1,
-        fontWeight: FontWeight.w800,
+        fontWeight: FontWeight.w600,
         letterSpacing: -1.4,
       ),
       displayMedium: TextStyle(
         fontSize: 34,
         height: 1.15,
-        fontWeight: FontWeight.w800,
+        fontWeight: FontWeight.w600,
         letterSpacing: -1,
       ),
       headlineLarge: TextStyle(
         fontSize: 28,
         height: 1.2,
-        fontWeight: FontWeight.w800,
+        fontWeight: FontWeight.w600,
         letterSpacing: -0.7,
       ),
       headlineMedium: TextStyle(
@@ -466,6 +485,10 @@ class AppTheme {
         fontWeight: FontWeight.w600,
         letterSpacing: 0.3,
       ),
-    ).apply(bodyColor: c.textPrimary, displayColor: c.textPrimary);
+    ).apply(
+      fontFamily: fontFamily,
+      bodyColor: c.textPrimary,
+      displayColor: c.textPrimary,
+    );
   }
 }

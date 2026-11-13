@@ -157,7 +157,10 @@ class _Summary extends StatelessWidget {
                       style: text.labelSmall?.copyWith(color: c.textMuted),
                     ),
                     const SizedBox(height: AppSpacing.xs),
-                    Text('${layout.score.round()}', style: text.displayMedium),
+                    Text(
+                      '${layout.score.round()}',
+                      style: text.displayMedium?.copyWith(color: c.accent),
+                    ),
                   ],
                 ),
               ),
@@ -339,6 +342,214 @@ class _PieceDetail extends StatelessWidget {
               child: Text(reason, style: text.bodyMedium),
             ),
         ],
+      ],
+    );
+  }
+}
+
+/// Phone "Pieces" tab: the room's pieces as tiles, and below them why the
+/// picked piece sits where it does.
+class RoomPiecesTab extends StatelessWidget {
+  const RoomPiecesTab({
+    super.key,
+    required this.layout,
+    required this.selectedId,
+    required this.onSelect,
+  });
+
+  final AnalysisLayout layout;
+  final String? selectedId;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final text = context.text;
+    AnalysisFurniture? picked;
+    for (final f in layout.furniture) {
+      if (f.id == selectedId) picked = f;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        LayoutBuilder(
+          builder: (context, box) {
+            const gap = AppSpacing.sm + 2;
+            final w = (box.maxWidth - gap * 2) / 3;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [
+                for (final piece in layout.furniture)
+                  SizedBox(
+                    width: w,
+                    child: Material(
+                      color: piece.id == selectedId
+                          ? c.surfaceElevated
+                          : c.surface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppRadius.mdAll,
+                        side: BorderSide(
+                          color: piece.id == selectedId ? c.primary : c.border,
+                        ),
+                      ),
+                      child: InkWell(
+                        customBorder: RoundedRectangleBorder(
+                          borderRadius: AppRadius.mdAll,
+                        ),
+                        onTap: () => onSelect(piece.id),
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.md - 2),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.chair_alt_outlined,
+                                size: 22,
+                                color: c.accent,
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              Text(
+                                piece.displayName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: text.labelMedium,
+                              ),
+                              Text(
+                                '${fmtMm(piece.width)} × ${fmtMm(piece.depth)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: text.labelSmall?.copyWith(
+                                  color: c.textMuted,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+        if (picked != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          AppCard(
+            radius: AppRadius.mdAll,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md + 2,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${picked.displayName} · '
+                        '${fmtMm(picked.width)} × ${fmtMm(picked.depth)}',
+                        style: text.titleSmall,
+                      ),
+                    ),
+                    Text(
+                      'Outlined in the room',
+                      style: text.labelSmall?.copyWith(color: c.accent),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm - 2),
+                Text(
+                  picked.reasons.isNotEmpty
+                      ? picked.reasons.join(' ')
+                      : 'Facing ${capitalised(picked.facing)}'
+                            '${prettyStrategy(picked.placementStrategy) == null ? '' : ' · placed by ${prettyStrategy(picked.placementStrategy)}'}.',
+                  style: text.bodySmall?.copyWith(
+                    color: c.textSecondary,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Phone "Room details" tab: score, status, size and piece count as tiles.
+class RoomFactsTab extends StatelessWidget {
+  const RoomFactsTab({super.key, required this.layout});
+
+  final AnalysisLayout layout;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final text = context.text;
+
+    Widget tile(String label, String value, {Color? color, bool big = false}) =>
+        AppCard(
+          radius: AppRadius.mdAll,
+          padding: const EdgeInsets.all(AppSpacing.md + 2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: text.labelSmall?.copyWith(color: c.textMuted)),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: (big ? text.headlineSmall : text.titleSmall)?.copyWith(
+                  color: color,
+                  fontWeight: big ? FontWeight.w700 : null,
+                ),
+              ),
+            ],
+          ),
+        );
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: tile(
+                'Layout score',
+                '${layout.score.round()}',
+                color: c.accent,
+                big: true,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm + 2),
+            Expanded(
+              child: tile(
+                'Status',
+                layout.valid ? 'Valid' : 'Compromised',
+                color: layout.valid ? c.success : c.warning,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm + 2),
+        Row(
+          children: [
+            Expanded(
+              child: tile(
+                'Room size',
+                '${(layout.roomWidth / 1000).toStringAsFixed(1)} × '
+                    '${(layout.roomLength / 1000).toStringAsFixed(1)} m',
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm + 2),
+            Expanded(
+              child: tile('Pieces', '${layout.furniture.length} placed'),
+            ),
+          ],
+        ),
       ],
     );
   }

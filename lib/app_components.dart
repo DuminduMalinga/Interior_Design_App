@@ -63,22 +63,19 @@ class AppButton extends StatelessWidget {
     final decoration = BoxDecoration(
       gradient: isPrimary ? c.brandGradient : null,
       color: switch (variant) {
-        AppButtonVariant.secondary => c.surfaceElevated,
+        AppButtonVariant.secondary => c.surface,
         _ => null,
       },
-      borderRadius: AppRadius.mdAll,
+      borderRadius: AppRadius.fullAll,
       border: variant == AppButtonVariant.secondary
           ? Border.all(color: c.border)
-          : null,
-      boxShadow: isPrimary && onPressed != null
-          ? AppShadows.glow(c.primary)
           : null,
     );
 
     return Opacity(
       opacity: this.onPressed == null && !loading ? 0.5 : 1,
       child: SizedBox(
-        height: 52,
+        height: 56,
         width: expanded ? double.infinity : null,
         child: Material(
           type: MaterialType.transparency,
@@ -86,7 +83,7 @@ class AppButton extends StatelessWidget {
             decoration: decoration,
             child: InkWell(
               onTap: onPressed,
-              borderRadius: AppRadius.mdAll,
+              borderRadius: AppRadius.fullAll,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
                 child: Center(
@@ -172,7 +169,6 @@ class AppCard extends StatelessWidget {
         border: Border.all(
           color: glass ? c.glassBorder : (borderColor ?? c.border),
         ),
-        boxShadow: glass ? null : AppShadows.soft,
       ),
       child: content,
     );
@@ -447,6 +443,176 @@ class AppSectionHeader extends StatelessWidget {
         if (actionLabel != null)
           TextButton(onPressed: onAction, child: Text(actionLabel!)),
       ],
+    );
+  }
+}
+
+/// A tab screen's title block: a large title with a caption beneath, and an
+/// optional round action button (refresh, more) on the right.
+class AppTabHeader extends StatelessWidget {
+  const AppTabHeader({
+    super.key,
+    required this.title,
+    this.caption,
+    this.actionIcon,
+    this.actionTooltip,
+    this.onAction,
+  });
+
+  final String title;
+  final String? caption;
+  final IconData? actionIcon;
+  final String? actionTooltip;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: context.text.headlineMedium),
+              if (caption != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  caption!,
+                  style: context.text.bodySmall?.copyWith(color: c.textMuted),
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (actionIcon != null)
+          AppRoundButton(
+            icon: actionIcon!,
+            tooltip: actionTooltip ?? '',
+            onPressed: onAction,
+          ),
+      ],
+    );
+  }
+}
+
+/// A 44 px circular icon button on a bordered surface.
+class AppRoundButton extends StatelessWidget {
+  const AppRoundButton({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.overImage = false,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  /// Translucent dark fill, for sitting on top of a photo or 3D view.
+  final bool overImage;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return IconButton(
+      onPressed: onPressed,
+      tooltip: tooltip,
+      constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+      padding: EdgeInsets.zero,
+      style: IconButton.styleFrom(
+        backgroundColor: overImage
+            ? c.background.withValues(alpha: .55)
+            : c.surface,
+        shape: CircleBorder(
+          side: BorderSide(
+            color: overImage ? c.textPrimary.withValues(alpha: .2) : c.border,
+          ),
+        ),
+      ),
+      icon: Icon(icon, size: 18, color: c.textPrimary),
+    );
+  }
+}
+
+/// A horizontally scrolling row of pill filters; the selected one is gold.
+class AppFilterChips extends StatelessWidget {
+  const AppFilterChips({
+    super.key,
+    required this.labels,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<String> labels;
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: labels.length,
+        separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
+        itemBuilder: (context, i) {
+          final label = labels[i];
+          final on = label == selected;
+          return Semantics(
+            button: true,
+            selected: on,
+            child: Material(
+              color: on ? c.primary : c.surface,
+              shape: StadiumBorder(
+                side: BorderSide(color: on ? c.primary : c.border),
+              ),
+              child: InkWell(
+                customBorder: const StadiumBorder(),
+                onTap: () => onSelected(label),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                  ),
+                  child: Center(
+                    child: Text(
+                      label,
+                      style: context.text.labelMedium?.copyWith(
+                        color: on ? c.onPrimary : c.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// The round back button used in app bars. Pass it as `leading` together
+/// with `leadingWidth: AppBackButton.width`.
+class AppBackButton extends StatelessWidget {
+  const AppBackButton({super.key});
+
+  static const double width = 72;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.only(left: AppSpacing.xl - 4),
+        child: AppRoundButton(
+          icon: Icons.arrow_back_rounded,
+          tooltip: 'Back',
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+      ),
     );
   }
 }

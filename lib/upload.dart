@@ -53,26 +53,17 @@ class _UploadScreenState extends State<UploadScreen> {
 
     return _TabScaffold(
       selectedIndex: 3,
-      appBar: AppBar(title: const Text('Upload floor plan')),
       body: SingleChildScrollView(
         child: AppContentFrame(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Bring your space to life',
-                style: context.responsive(
-                  mobile: text.headlineMedium,
-                  tablet: text.headlineLarge,
-                  desktop: text.displayMedium,
-                ),
+              const AppTabHeader(
+                title: 'Upload plan',
+                caption:
+                    'Our AI will turn your floor plan into a smart, editable design.',
               ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Upload a floor plan and our AI will turn it into a smart, editable design.',
-                style: text.bodyMedium?.copyWith(color: c.textSecondary),
-              ),
-              const SizedBox(height: AppSpacing.xxl),
+              const SizedBox(height: AppSpacing.xl),
               if (wide)
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -211,15 +202,8 @@ class _UploadDropzone extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(AppSpacing.xl),
           decoration: BoxDecoration(
-            color: c.primary.withValues(alpha: 0.05),
+            color: c.surface,
             borderRadius: AppRadius.xlAll,
-            boxShadow: [
-              BoxShadow(
-                color: c.primary.withValues(alpha: 0.10),
-                blurRadius: 36,
-                spreadRadius: 2,
-              ),
-            ],
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -230,15 +214,7 @@ class _UploadDropzone extends StatelessWidget {
                 DecoratedBox(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [
-                        c.primary.withValues(alpha: 0.28),
-                        c.secondary.withValues(alpha: 0.22),
-                      ],
-                    ),
-                    border: Border.all(
-                      color: c.primary.withValues(alpha: 0.35),
-                    ),
+                    color: c.primary.withValues(alpha: 0.16),
                   ),
                   child: SizedBox.square(
                     dimension: 72,
@@ -246,7 +222,7 @@ class _UploadDropzone extends StatelessWidget {
                       selected
                           ? Icons.check_rounded
                           : Icons.cloud_upload_outlined,
-                      color: c.textPrimary,
+                      color: c.primary,
                       size: 32,
                     ),
                   ),
@@ -311,11 +287,11 @@ class _UploadAction extends StatelessWidget {
       label: Text(label),
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(0, 40),
-        backgroundColor: c.glassFill,
-        side: BorderSide(color: c.glassBorder),
+        backgroundColor: c.surfaceElevated,
+        side: BorderSide(color: c.border),
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
         textStyle: context.text.labelMedium,
-        shape: const RoundedRectangleBorder(borderRadius: AppRadius.smAll),
+        shape: const StadiumBorder(),
       ),
     );
   }
@@ -455,9 +431,15 @@ class _DashedBorderPainter extends CustomPainter {
 }
 
 class _LegacyProcessingScreen extends StatefulWidget {
-  const _LegacyProcessingScreen({required this.floorPlan});
+  const _LegacyProcessingScreen({
+    required this.floorPlan,
+    this.preview = false,
+  });
 
   final FloorPlanRecord floorPlan;
+
+  /// Only shows the animation; nothing is analysed.
+  final bool preview;
 
   @override
   State<_LegacyProcessingScreen> createState() => _ProcessingScreenState();
@@ -485,7 +467,7 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
       duration: const Duration(milliseconds: 2200),
     )..repeat();
     _statusTimer = Timer(const Duration(milliseconds: 1500), _advanceStatus);
-    _analyse();
+    if (!widget.preview) _analyse();
   }
 
   /// Opens the rooms when the floor plan has been analysed already,
@@ -578,7 +560,7 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
                   child: CustomPaint(
                     painter: _ScanlinePainter(
                       line: c.primary.withValues(alpha: 0.035),
-                      glow: c.primary.withValues(alpha: 0.13),
+                      glow: c.primary.withValues(alpha: 0.05),
                     ),
                   ),
                 ),
@@ -586,10 +568,10 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
               Positioned(
                 top: AppSpacing.md,
                 left: AppSpacing.md,
-                child: IconButton(
+                child: AppRoundButton(
                   onPressed: () => Navigator.of(context).maybePop(),
                   tooltip: 'Back',
-                  icon: Icon(Icons.close_rounded, color: c.textMuted),
+                  icon: Icons.close_rounded,
                 ),
               ),
               Center(
@@ -605,7 +587,7 @@ class _ProcessingScreenState extends State<_LegacyProcessingScreen>
                             progress: _controller.value,
                             track: c.glassFill,
                             start: c.primary,
-                            end: c.secondary,
+                            end: c.accent,
                           ),
                           child: Center(
                             child: Transform.scale(

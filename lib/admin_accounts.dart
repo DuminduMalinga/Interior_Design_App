@@ -4,7 +4,15 @@ part of 'main.dart';
 /// can search and delete after confirming (customers only: admin accounts are
 /// protected, as on the web), and the activity log of what admins did.
 class AdminAccountsScreen extends StatefulWidget {
-  const AdminAccountsScreen({super.key});
+  const AdminAccountsScreen({super.key}) : _preview = null;
+
+  /// Shows these accounts and activity as if they had just loaded.
+  const AdminAccountsScreen._preview(
+    List<AdminUserRecord> users,
+    List<AuditEntry> activity,
+  ) : _preview = (users, activity);
+
+  final (List<AdminUserRecord>, List<AuditEntry>)? _preview;
 
   @override
   State<AdminAccountsScreen> createState() => _AdminAccountsScreenState();
@@ -25,7 +33,13 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    final preview = widget._preview;
+    if (preview != null) {
+      _users = preview.$1;
+      _activity = preview.$2;
+    } else {
+      _load();
+    }
   }
 
   Future<void> _load() async {
@@ -142,11 +156,8 @@ class _AdminAccountsScreenState extends State<AdminAccountsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).maybePop(),
-          tooltip: 'Back',
-          icon: const Icon(Icons.arrow_back_rounded),
-        ),
+        leading: const AppBackButton(),
+        leadingWidth: AppBackButton.width,
         title: const Text('Manage accounts'),
         actions: [
           IconButton(
@@ -535,14 +546,14 @@ class _FilterTab extends StatelessWidget {
         type: MaterialType.transparency,
         child: InkWell(
           onTap: onTap,
-          borderRadius: AppRadius.mdAll,
+          borderRadius: AppRadius.fullAll,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            height: 52,
+            height: 44,
             decoration: BoxDecoration(
               gradient: selected ? c.brandGradient : null,
               color: selected ? null : c.surface,
-              borderRadius: AppRadius.mdAll,
+              borderRadius: AppRadius.fullAll,
               border: Border.all(
                 color: selected ? Colors.transparent : c.border,
               ),
@@ -808,3 +819,10 @@ Widget adminUserCardForTest(
   busy: busy,
   onDelete: onDelete ?? () {},
 );
+
+/// The account manager with these accounts, without the database.
+@visibleForTesting
+Widget adminPreviewForTest(
+  List<AdminUserRecord> users,
+  List<AuditEntry> activity,
+) => AdminAccountsScreen._preview(users, activity);

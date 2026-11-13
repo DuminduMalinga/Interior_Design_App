@@ -8,7 +8,16 @@ part of 'main.dart';
 /// from its best `Layout.Score` so the user can judge how well a room fits
 /// before continuing.
 class RoomSelectionScreen extends StatefulWidget {
-  const RoomSelectionScreen({required this.floorPlan, super.key});
+  const RoomSelectionScreen({required this.floorPlan, super.key})
+    : _preview = null;
+
+  /// Shows [data] as if it had just loaded, without the database.
+  const RoomSelectionScreen._preview({
+    required this.floorPlan,
+    required _RoomSelectionData data,
+  }) : _preview = data;
+
+  final _RoomSelectionData? _preview;
 
   final FloorPlanRecord floorPlan;
 
@@ -252,6 +261,17 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
   bool _loadFailed = false;
 
   @override
+  void initState() {
+    super.initState();
+    final preview = widget._preview;
+    if (preview != null) {
+      _data = preview;
+      final first = preview.rooms.indexWhere((r) => r.layoutsSupported);
+      _selected = first == -1 ? null : first;
+    }
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_data == null) _load();
@@ -289,6 +309,7 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
     final furnishable = rooms?.where((r) => r.layoutsSupported).length ?? 0;
 
     Widget body;
+    Widget? cta;
     if (_loadFailed && rooms == null) {
       body = _LoadError(
         onRetry: _load,
@@ -353,19 +374,6 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
               },
             );
 
-      Widget cards(Iterable<int> indexes, {required bool enabled}) => Column(
-        children: [
-          for (final i in indexes) ...[
-            _RoomCard(
-              room: rooms[i],
-              selected: i == selected,
-              enabled: enabled,
-              onTap: () => setState(() => _selected = i),
-            ),
-            const SizedBox(height: AppSpacing.md),
-          ],
-        ],
-      );
       final ready = [
         for (var i = 0; i < rooms.length; i++)
           if (rooms[i].layoutsSupported) i,
@@ -378,41 +386,77 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
       final list = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Ready to furnish ($furnishable)', style: text.titleMedium),
-          const SizedBox(height: AppSpacing.md),
+          if (room != null) ...[
+            _SelectedRoomCard(room: room),
+            const SizedBox(height: AppSpacing.lg),
+          ],
+          Text('Rooms you can furnish', style: text.titleSmall),
+          const SizedBox(height: AppSpacing.md - 2),
           if (ready.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
-              child: Text(
-                'None of the rooms in this plan can be furnished yet.',
-                style: text.bodySmall?.copyWith(color: c.textMuted),
-              ),
+            Text(
+              'None of the rooms in this plan can be furnished yet.',
+              style: text.bodySmall?.copyWith(color: c.textMuted),
             )
           else
-            cards(ready, enabled: true),
+            LayoutBuilder(
+              builder: (context, box) {
+                const gap = AppSpacing.sm;
+                final cols = box.maxWidth >= 420 ? 4 : 3;
+                final w = (box.maxWidth - gap * (cols - 1)) / cols;
+                return Wrap(
+                  spacing: gap,
+                  runSpacing: gap,
+                  children: [
+                    for (final i in ready)
+                      SizedBox(
+                        width: w,
+                        child: _RoomTile(
+                          room: rooms[i],
+                          selected: i == selected,
+                          onTap: () => setState(() => _selected = i),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
           if (blocked.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              "Can't furnish yet (${blocked.length})",
-              style: text.titleMedium,
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'Layouts are available for living rooms, bedrooms, kitchens, '
-              'bathrooms and dining areas.',
-              style: text.bodySmall?.copyWith(color: c.textMuted),
-            ),
             const SizedBox(height: AppSpacing.md),
-            cards(blocked, enabled: false),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  "Can't furnish yet",
+                  style: text.labelMedium?.copyWith(color: c.textMuted),
+                ),
+                for (final i in blocked)
+                  _BlockedRoomChip(
+                    label: rooms[i].name,
+                    selected: i == selected,
+                    onTap: () => setState(() => _selected = i),
+                  ),
+              ],
+            ),
           ],
-          const SizedBox(height: AppSpacing.md),
-          AppButton(
-            label: room == null ? 'Choose a room' : 'Design the ${room.name}',
-            icon: Icons.auto_awesome_rounded,
-            onPressed: room == null ? null : () => _openLayouts(context, room),
-          ),
         ],
       );
+
+      cta = room == null
+          ? const AppButton(label: 'Choose a room', onPressed: null)
+          : room.layoutsSupported
+          ? AppButton(
+              label: 'See layouts for ${room.name.toLowerCase()}',
+              icon: Icons.arrow_forward_rounded,
+              iconAfterLabel: true,
+              onPressed: () => _openLayouts(context, room),
+            )
+          : AppButton(
+              label: 'No layouts for ${room.name.toLowerCase()} yet',
+              variant: AppButtonVariant.secondary,
+              onPressed: null,
+            );
 
       body = wide
           ? Row(
@@ -432,49 +476,53 @@ class _RoomSelectionScreenState extends State<RoomSelectionScreen> {
             );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).maybePop(),
+    final header = Row(
+      children: [
+        AppRoundButton(
+          icon: Icons.arrow_back_rounded,
           tooltip: 'Back',
-          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: const Text('Select a room'),
-      ),
+        Expanded(
+          child: Column(
+            children: [
+              Text('Detected rooms', style: text.titleMedium),
+              Text(
+                rooms == null
+                    ? 'Looking at your floor plan'
+                    : '${rooms.length} room${rooms.length == 1 ? '' : 's'} · '
+                          '$furnishable we can furnish',
+                style: text.bodySmall?.copyWith(color: c.textMuted),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 44),
+      ],
+    );
+
+    return Scaffold(
       body: AppBackground(
         child: SafeArea(
-          child: SingleChildScrollView(
-            child: AppContentFrame(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _AiPill(),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    rooms == null
-                        ? 'Looking at your floor plan'
-                        : 'We found ${rooms.length} room'
-                              '${rooms.length == 1 ? '' : 's'}',
-                    style: context.responsive(
-                      mobile: text.headlineMedium,
-                      tablet: text.headlineLarge,
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  child: AppContentFrame(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        header,
+                        const SizedBox(height: AppSpacing.lg),
+                        body,
+                      ],
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    rooms == null || rooms.isEmpty
-                        ? 'Tap a room on the plan or in the list to see how '
-                              'well it suits an AI redesign.'
-                        : '$furnishable we can furnish. Tap a room on the plan '
-                              'or in the list to see how well it suits an AI '
-                              'redesign.',
-                    style: text.bodyMedium?.copyWith(color: c.textSecondary),
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  body,
-                ],
+                ),
               ),
-            ),
+              if (cta != null)
+                AppContentFrame(verticalPadding: AppSpacing.md, child: cta),
+            ],
           ),
         ),
       ),
@@ -612,13 +660,6 @@ class _FloorPlanPainter extends CustomPainter {
         room.bounds.height * size.height,
       ).deflate(2.5);
 
-      if (isSelected) {
-        final glow = Paint()
-          ..color = color.withValues(alpha: 0.35)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
-        canvas.drawRect(rect, glow);
-      }
-
       canvas.drawRect(
         rect,
         Paint()..color = color.withValues(alpha: isSelected ? 0.30 : 0.14),
@@ -685,126 +726,275 @@ class _FloorPlanPainter extends CustomPainter {
       oldDelegate.labelStyle != labelStyle;
 }
 
-/// A tappable card summarizing a detected room and its AI suitability score.
-class _RoomCard extends StatelessWidget {
-  const _RoomCard({
+/// The picked room: name, tag, how sure the detector was and how well it
+/// suits a redesign.
+class _SelectedRoomCard extends StatelessWidget {
+  const _SelectedRoomCard({required this.room});
+
+  final _DetectedRoom room;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final text = context.text;
+    final ok = room.layoutsSupported;
+    final conf = room.confidence;
+
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(room.name, style: text.titleLarge),
+                    if (room.sizeNote != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Size ${room.sizeNote}',
+                        style: text.bodySmall?.copyWith(color: c.textMuted),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: ok ? c.primary.withValues(alpha: 0.16) : c.border,
+                  borderRadius: AppRadius.fullAll,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md - 2,
+                    vertical: 5,
+                  ),
+                  child: Text(
+                    ok ? 'Can furnish' : 'Not yet',
+                    style: text.labelSmall?.copyWith(
+                      color: ok ? c.accent : c.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: _MiniFact(
+                  label: 'Detector confidence',
+                  child: Text(
+                    conf == null ? '–' : '${(conf * 100).round()}%',
+                    style: text.titleSmall,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: _MiniFact(
+                  label: 'Suitability',
+                  child: Row(
+                    children: [
+                      Text(
+                        ok && room.suitability > 0
+                            ? '${room.suitability}'
+                            : '–',
+                        style: text.titleSmall,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: AppRadius.fullAll,
+                          child: LinearProgressIndicator(
+                            value: ok ? room.suitability / 100 : 0,
+                            minHeight: 6,
+                            backgroundColor: c.border,
+                            valueColor: AlwaysStoppedAnimation(c.primary),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (room.note.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              room.note,
+              style: text.bodySmall?.copyWith(color: c.textMuted),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniFact extends StatelessWidget {
+  const _MiniFact({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: context.text.labelSmall?.copyWith(
+            color: context.colors.textMuted,
+          ),
+        ),
+        const SizedBox(height: 6),
+        child,
+      ],
+    );
+  }
+}
+
+/// A pickable room in the "you can furnish" grid; the picked one is gold.
+class _RoomTile extends StatelessWidget {
+  const _RoomTile({
     required this.room,
     required this.selected,
     required this.onTap,
-    this.enabled = true,
   });
 
   final _DetectedRoom room;
   final bool selected;
   final VoidCallback onTap;
 
-  /// False for a room no layout engine covers yet: shown dimmed and not
-  /// pickable, with no suitability score.
-  final bool enabled;
-
-  /// "97% confidence · size from the plan's printed area", whichever the
-  /// detection recorded.
-  String? get _details {
-    final parts = [
-      if (room.confidence != null)
-        '${(room.confidence! * 100).round()}% confidence',
-      if (room.sizeNote != null) 'size ${room.sizeNote}',
-    ];
-    return parts.isEmpty ? null : parts.join(' · ');
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final text = context.text;
-    final color = room.colorIn(c);
-    final status = _scoreStatus(room.suitability);
-    final scoreColor = status.colorIn(c);
-    final details = _details;
-
-    return Opacity(
-      opacity: enabled ? 1 : 0.55,
-      child: AppCard(
-        onTap: enabled ? onTap : null,
-        color: selected ? c.primary.withValues(alpha: 0.08) : null,
-        borderColor: selected ? c.primary.withValues(alpha: 0.55) : null,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: color.withValues(alpha: 0.18),
-                border: Border.all(color: color.withValues(alpha: 0.4)),
-              ),
-              child: SizedBox.square(
-                dimension: 48,
-                child: Icon(room.icon, color: color, size: 22),
-              ),
+    final fg = selected ? c.onPrimary : c.textPrimary;
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: selected ? c.primary : c.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.mdAll,
+          side: BorderSide(color: selected ? c.primary : c.border),
+        ),
+        child: InkWell(
+          customBorder: RoundedRectangleBorder(borderRadius: AppRadius.mdAll),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md - 2,
+              vertical: AppSpacing.sm + 2,
             ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(child: Text(room.name, style: text.titleSmall)),
-                      // a room that has not been scored has no match to show
-                      if (enabled && room.suitability > 0)
-                        AppStatusChip(
-                          label: '${room.suitability}% match',
-                          status: status,
-                        ),
-                    ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  room.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: text.labelMedium?.copyWith(color: fg),
+                ),
+                Text(
+                  room.suitability > 0 ? 'Score ${room.suitability}' : 'Ready',
+                  style: text.labelSmall?.copyWith(
+                    color: fg.withValues(alpha: .8),
+                    fontWeight: FontWeight.w500,
                   ),
-                  if (enabled) ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      room.tag,
-                      style: text.labelMedium?.copyWith(color: scoreColor),
-                    ),
-                  ],
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    room.note,
-                    style: text.bodySmall?.copyWith(color: c.textMuted),
-                  ),
-                  if (details != null) ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      details,
-                      style: text.labelSmall?.copyWith(color: c.textMuted),
-                    ),
-                  ],
-                  if (enabled) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    ClipRRect(
-                      borderRadius: AppRadius.fullAll,
-                      child: LinearProgressIndicator(
-                        value: room.suitability / 100,
-                        minHeight: 5,
-                        backgroundColor: c.glassFill,
-                        valueColor: AlwaysStoppedAnimation(scoreColor),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(width: AppSpacing.sm),
-            Icon(
-              !enabled
-                  ? Icons.block_rounded
-                  : selected
-                  ? Icons.check_circle_rounded
-                  : Icons.radio_button_unchecked_rounded,
-              color: selected && enabled ? c.primary : c.border,
-              size: 20,
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
+}
+
+/// A dashed-outline chip for a room that has no layouts yet.
+class _BlockedRoomChip extends StatelessWidget {
+  const _BlockedRoomChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Material(
+      color: selected ? c.surfaceElevated : Colors.transparent,
+      shape: StadiumBorder(
+        side: BorderSide(color: selected ? c.textMuted : c.border),
+      ),
+      child: InkWell(
+        customBorder: const StadiumBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm - 1,
+          ),
+          child: Text(
+            label,
+            style: context.text.labelMedium?.copyWith(
+              color: c.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The room selection screen with these rooms, without the database.
+/// Each is (name, size, detector confidence, score, where the size came
+/// from); a score of 0 marks a room that can't be furnished yet.
+@visibleForTesting
+Widget roomSelectionPreviewForTest(
+  List<(String, String, double, int, String)> rooms,
+) {
+  final accents = _RoomAccent.values;
+  return RoomSelectionScreen._preview(
+    floorPlan: FloorPlanRecord(
+      floorPlanId: 'preview',
+      userId: 'preview',
+      imagePath: '',
+      status: 'Detected',
+      uploadDateTime: DateTime(2026, 11, 1),
+    ),
+    data: _RoomSelectionData(
+      rooms: [
+        for (final (i, r) in rooms.indexed)
+          _DetectedRoom(
+            roomId: 'room-$i',
+            name: r.$1,
+            icon: _iconForRoomType(r.$1),
+            accent: accents[i % accents.length],
+            bounds: _boundsForIndex(i, rooms.length),
+            suitability: r.$4,
+            note: r.$2,
+            confidence: r.$3,
+            sizeNote: r.$5,
+            fromAnalysis: true,
+            layoutsSupported: RoomKind.fromName(r.$1)?.isSupported ?? false,
+          ),
+      ],
+    ),
+  );
 }

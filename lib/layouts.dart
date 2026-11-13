@@ -13,7 +13,16 @@ class LayoutsScreen extends StatefulWidget {
     required this.room,
     required this.floorPlanId,
     super.key,
-  });
+  }) : _preview = null;
+
+  /// Shows [options] as if they had just loaded, without the database.
+  const LayoutsScreen._preview({
+    required this.room,
+    required List<_LayoutOption> options,
+  }) : floorPlanId = 'preview',
+       _preview = options;
+
+  final List<_LayoutOption>? _preview;
 
   final _DetectedRoom room;
 
@@ -81,6 +90,30 @@ class _LayoutOption {
   final List<PlacedFurniture> furniture;
 }
 
+/// The engine layouts of [set] as options, best first.
+List<_LayoutOption> _optionsFromSet(AnalysisLayoutSet set) {
+  final usable = set.layouts.where((l) => !l.hasError).toList();
+  return [
+    for (final (i, l) in usable.indexed)
+      _LayoutOption(
+        layoutId: l.type,
+        title: l.title,
+        tags: [
+          '${l.furniture.length} pieces',
+          l.valid ? 'Validated' : 'Needs review',
+        ],
+        matchScore: (l.suitability > 0 ? l.suitability : l.score).round().clamp(
+          0,
+          100,
+        ),
+        variant: i,
+        furniture: const [],
+        analysis: l,
+        isRecommended: set.bestType != null ? l.type == set.bestType : i == 0,
+      ),
+  ];
+}
+
 Future<List<_LayoutOption>> _loadLayoutOptions(
   _DetectedRoom room,
   String floorPlanId,
@@ -92,25 +125,7 @@ Future<List<_LayoutOption>> _loadLayoutOptions(
     final set = AnalysisLayoutSet.from(analysis?.layoutJson);
     // The web stores layouts for one room at a time.
     if (set == null || set.roomId != room.roomId) return const [];
-    final usable = set.layouts.where((l) => !l.hasError).toList();
-    return [
-      for (final (i, l) in usable.indexed)
-        _LayoutOption(
-          layoutId: l.type,
-          title: l.title,
-          tags: [
-            '${l.furniture.length} pieces',
-            l.valid ? 'Validated' : 'Needs review',
-          ],
-          matchScore: (l.suitability > 0 ? l.suitability : l.score)
-              .round()
-              .clamp(0, 100),
-          variant: i,
-          furniture: const [],
-          analysis: l,
-          isRecommended: set.bestType != null ? l.type == set.bestType : i == 0,
-        ),
-    ];
+    return _optionsFromSet(set);
   }
 
   final roomId = room.roomId;
@@ -152,7 +167,12 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
   void initState() {
     super.initState();
     _pageController = PageController(viewportFraction: .86);
-    _load();
+    final preview = widget._preview;
+    if (preview != null) {
+      _layouts = preview;
+    } else {
+      _load();
+    }
   }
 
   Future<void> _load() async {
@@ -397,13 +417,13 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
       children: [
         Row(
           children: [
-            Icon(room.icon, color: roomColor, size: 20),
+            Icon(room.icon, color: c.primary, size: 20),
             const SizedBox(width: AppSpacing.sm),
             Flexible(
               child: Text(
                 'Layouts for the ${room.name}',
                 style: context.responsive(
-                  mobile: text.headlineSmall,
+                  mobile: text.titleLarge,
                   tablet: text.headlineLarge,
                 ),
               ),
@@ -425,7 +445,7 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
               ),
               TextSpan(
                 text: isMobile
-                    ? ', swipe to compare AI-scored layouts.'
+                    ? ', tap a layout to compare the AI-scored options.'
                     : ', compare the AI-scored layouts below.',
               ),
             ],
@@ -436,23 +456,54 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
     );
 
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).maybePop(),
-          tooltip: 'Back',
-          icon: const Icon(Icons.arrow_back_rounded),
-        ),
-        title: const Text('AI layouts'),
-      ),
       body: AppBackground(
         child: SafeArea(
-          child: _layouts == null
-              ? (_loadFailed ? _buildError(header) : _buildLoading(header))
-              : _layouts!.isEmpty
-              ? _buildEmpty(context, header)
-              : isMobile
-              ? _buildDeck(context, header, roomColor, _layouts!)
-              : _buildGrid(context, header, _layouts!),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.md,
+                  AppSpacing.xl,
+                  0,
+                ),
+                child: Row(
+                  children: [
+                    AppRoundButton(
+                      icon: Icons.arrow_back_rounded,
+                      tooltip: 'Back',
+                      onPressed: () => Navigator.of(context).maybePop(),
+                    ),
+                    Expanded(
+                      child: Text(
+                        'AI layouts',
+                        textAlign: TextAlign.center,
+                        style: text.titleMedium,
+                      ),
+                    ),
+                    AppRoundButton(
+                      icon: Icons.refresh_rounded,
+                      tooltip: 'Refresh layouts',
+                      onPressed: _canGenerate && !_generating
+                          ? _generate
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _layouts == null
+                    ? (_loadFailed
+                          ? _buildError(header)
+                          : _buildLoading(header))
+                    : _layouts!.isEmpty
+                    ? _buildEmpty(context, header)
+                    : isMobile
+                    ? _buildList(context, header, _layouts!)
+                    : _buildGrid(context, header, _layouts!),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -693,63 +744,93 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
     );
   }
 
-  Widget _buildDeck(
+  /// Phone: every layout as a row, best first. Tapping a row focuses it;
+  /// the bar below previews it in 3D or confirms and saves it.
+  Widget _buildList(
     BuildContext context,
     Widget header,
-    Color roomColor,
     List<_LayoutOption> layouts,
   ) {
     final c = context.colors;
+    final text = context.text;
+    final focus = _page.clamp(0, layouts.length - 1);
+    final focused = layouts[focus];
+    final focusedBest = focused.analysis != null
+        ? focused.isRecommended
+        : focus == 0;
+    final alreadyChosen = focused.layoutId == _selectedLayoutId;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              AppSpacing.md,
+              AppSpacing.xl,
+              AppSpacing.lg,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                header,
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('AI layout choices', style: text.titleSmall),
+                    Text(
+                      'Sorted by match',
+                      style: text.labelSmall?.copyWith(color: c.textMuted),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                for (final (i, layout) in layouts.indexed) ...[
+                  _LayoutRowCard(
+                    room: widget.room,
+                    layout: layout,
+                    focused: i == focus,
+                    chosen: layout.layoutId == _selectedLayoutId,
+                    onTap: () => setState(() => _page = i),
+                  ),
+                  const SizedBox(height: AppSpacing.md - 2),
+                ],
+              ],
+            ),
+          ),
+        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.xl,
-            AppSpacing.xs,
+            AppSpacing.sm,
             AppSpacing.xl,
-            0,
+            AppSpacing.lg,
           ),
-          child: header,
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        Expanded(
-          child: PageView.builder(
-            controller: _pageController,
-            itemCount: layouts.length,
-            onPageChanged: (i) => setState(() => _page = i),
-            itemBuilder: (context, index) {
-              final isActive = index == _page;
-              return AnimatedPadding(
-                duration: const Duration(milliseconds: 200),
-                padding: EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm,
-                  vertical: isActive ? 0 : AppSpacing.lg,
-                ),
-                child: _cardFor(layouts, index),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            for (var i = 0; i < layouts.length; i++)
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                width: i == _page ? 20 : 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: i == _page ? roomColor : c.border,
-                  borderRadius: AppRadius.fullAll,
-                ),
+          child: Row(
+            children: [
+              AppRoundButton(
+                icon: Icons.view_in_ar_outlined,
+                tooltip: 'Preview in 3D',
+                onPressed: () => _open3D(focused),
               ),
-          ],
+              const SizedBox(width: AppSpacing.md - 2),
+              Expanded(
+                child: alreadyChosen
+                    ? AppButton(
+                        label: 'View in 3D',
+                        icon: Icons.view_in_ar_outlined,
+                        onPressed: () => _open3D(focused),
+                      )
+                    : AppButton(
+                        label: 'Confirm and save design',
+                        onPressed: () =>
+                            _selectLayout(focused, isBest: focusedBest),
+                      ),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: AppSpacing.xl),
       ],
     );
   }
@@ -780,6 +861,188 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One layout as a row: a plan preview, its name, tags and match score.
+class _LayoutRowCard extends StatelessWidget {
+  const _LayoutRowCard({
+    required this.room,
+    required this.layout,
+    required this.focused,
+    required this.chosen,
+    required this.onTap,
+  });
+
+  final _DetectedRoom room;
+  final _LayoutOption layout;
+  final bool focused;
+  final bool chosen;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final text = context.text;
+    final analysis = layout.analysis;
+    final pieces = analysis?.furniture.length ?? layout.furniture.length;
+    final valid = analysis?.valid ?? true;
+
+    return Semantics(
+      button: true,
+      selected: focused,
+      child: Material(
+        color: c.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.lgAll,
+          side: BorderSide(
+            color: focused ? c.primary : c.border,
+            width: focused ? 1.5 : 1,
+          ),
+        ),
+        child: InkWell(
+          customBorder: RoundedRectangleBorder(borderRadius: AppRadius.lgAll),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: IntrinsicHeight(
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 120,
+                    height: 112,
+                    child: ClipRRect(
+                      borderRadius: AppRadius.smAll,
+                      child: ColoredBox(
+                        color: c.surfaceElevated,
+                        child: CustomPaint(
+                          painter: analysis != null
+                              ? _AnalysisPlanPainter(
+                                  layout: analysis,
+                                  wall: c.textPrimary.withValues(alpha: 0.35),
+                                  door: c.accent,
+                                  window: c.secondary,
+                                  colorFor: (t) => _furnitureColor(t, c),
+                                )
+                              : _LayoutRenderPainter(
+                                  accent: c.primary,
+                                  wall: c.textPrimary.withValues(alpha: 0.3),
+                                  variant: layout.variant,
+                                ),
+                          size: Size.infinite,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              layout.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: text.titleSmall,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              chosen
+                                  ? 'Selected · $pieces pieces placed'
+                                  : '$pieces pieces placed',
+                              style: text.labelSmall?.copyWith(
+                                color: chosen ? c.primary : c.textMuted,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (layout.tags.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: [
+                                for (final t in layout.tags.take(2))
+                                  DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: c.surfaceElevated,
+                                      borderRadius: AppRadius.fullAll,
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 9,
+                                        vertical: 3,
+                                      ),
+                                      child: Text(
+                                        t,
+                                        style: text.labelSmall?.copyWith(
+                                          color: c.textSecondary,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text.rich(
+                              TextSpan(
+                                text: '${layout.matchScore}%',
+                                style: text.titleLarge?.copyWith(
+                                  color: c.accent,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: ' match',
+                                    style: text.labelSmall?.copyWith(
+                                      color: c.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  valid
+                                      ? Icons.check_rounded
+                                      : Icons.warning_amber_rounded,
+                                  size: 14,
+                                  color: valid ? c.success : c.warning,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  valid ? 'Valid' : 'Compromised',
+                                  style: text.labelSmall?.copyWith(
+                                    color: valid ? c.success : c.warning,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -817,7 +1080,7 @@ class _LayoutCard extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: AppRadius.xlAll,
         border: isSelected || isBest
-            ? Border.all(color: isSelected ? c.success : roomColor, width: 1.6)
+            ? Border.all(color: isSelected ? c.primary : c.accent, width: 1.6)
             : null,
       ),
       child: AppCard(
@@ -918,8 +1181,8 @@ class _LayoutCard extends StatelessWidget {
                 onPressed: onView3D,
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(46),
-                  side: BorderSide(color: roomColor.withValues(alpha: 0.55)),
-                  backgroundColor: roomColor.withValues(alpha: 0.10),
+                  side: BorderSide(color: c.primary),
+                  backgroundColor: c.primary.withValues(alpha: 0.10),
                 ),
                 icon: const Icon(Icons.view_in_ar_outlined, size: 18),
                 label: const Text('View in 3D'),
@@ -1344,3 +1607,23 @@ void _showLayoutDetails(BuildContext context, _LayoutOption option) {
     ),
   );
 }
+
+/// The layouts screen for [set], without the database, so tests and the
+/// README screenshots can show it.
+@visibleForTesting
+Widget layoutsPreviewForTest({
+  required String roomName,
+  required AnalysisLayoutSet set,
+}) => LayoutsScreen._preview(
+  room: _DetectedRoom(
+    roomId: set.roomId ?? 'room-1',
+    name: roomName,
+    icon: _iconForRoomType(roomName),
+    accent: _RoomAccent.primary,
+    bounds: Rect.zero,
+    suitability: 88,
+    note: '',
+    fromAnalysis: true,
+  ),
+  options: _optionsFromSet(set),
+);

@@ -4,7 +4,13 @@ part of 'main.dart';
 /// the web dashboard's "My Designs" lists them. Designs saved on the web
 /// show here too, and the reverse.
 class DesignsScreen extends StatefulWidget {
-  const DesignsScreen({super.key});
+  const DesignsScreen({super.key}) : _preview = null;
+
+  /// Shows [designs] as if they had just loaded, without the database.
+  const DesignsScreen._preview(List<SavedDesignRecord> designs)
+    : _preview = designs;
+
+  final List<SavedDesignRecord>? _preview;
 
   @override
   State<DesignsScreen> createState() => _DesignsScreenState();
@@ -20,7 +26,12 @@ class _DesignsScreenState extends State<DesignsScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    final preview = widget._preview;
+    if (preview != null) {
+      _designs = [...preview];
+    } else {
+      _load();
+    }
   }
 
   Future<void> _load() async {
@@ -112,13 +123,10 @@ class _DesignsScreenState extends State<DesignsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
-    final text = context.text;
     final designs = _designs;
 
     return _TabScaffold(
       selectedIndex: 2,
-      appBar: AppBar(title: const Text('My designs')),
       body: RefreshIndicator(
         onRefresh: _load,
         child: SingleChildScrollView(
@@ -127,19 +135,17 @@ class _DesignsScreenState extends State<DesignsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  designs == null
+                AppTabHeader(
+                  title: 'My designs',
+                  caption: designs == null
                       ? 'Loading designs'
                       : '${designs.length} saved design'
                             '${designs.length == 1 ? '' : 's'}',
-                  style: text.headlineSmall,
+                  actionIcon: Icons.refresh_rounded,
+                  actionTooltip: 'Refresh designs',
+                  onAction: _load,
                 ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  'Rooms you furnished and saved, here or on the web.',
-                  style: text.bodyMedium?.copyWith(color: c.textSecondary),
-                ),
-                const SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpacing.lg),
                 if (_loadFailed && designs == null)
                   _LoadError(onRetry: _load)
                 else if (designs == null)
@@ -367,3 +373,8 @@ class _SavedDesignCard extends StatelessWidget {
     );
   }
 }
+
+/// The saved designs tab listing [designs], without the database.
+@visibleForTesting
+Widget designsPreviewForTest(List<SavedDesignRecord> designs) =>
+    DesignsScreen._preview(designs);

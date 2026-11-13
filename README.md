@@ -48,15 +48,76 @@ services, and a shareable 3D-style room experience.
 
 ## Screenshots
 
-A few highlights, shown in the dark theme at mobile width.
+LiviSpace has a warm, dark look: a near-black canvas, soft taupe surfaces, a
+single gold accent, Plus Jakarta Sans type, pill-shaped buttons and a floating
+navigation bar. These are the real screens at phone width in the dark theme,
+in the order you meet them.
 
 <div align="center">
 
-| Home | Detected rooms | AI layout choices | Bedroom layout |
-|:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/home.png" alt="Home" width="170" /> | <img src="docs/screenshots/room-selection.png" alt="Detected rooms" width="170" /> | <img src="docs/screenshots/layout-choices.png" alt="AI layout choices" width="170" /> | <img src="docs/screenshots/layout-bedroom.png" alt="Bedroom layout" width="170" /> |
+**Get started**
+
+| Welcome | Sign in | Home |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/welcome.png" alt="Welcome" width="210" /> | <img src="docs/screenshots/sign-in.png" alt="Sign in" width="210" /> | <img src="docs/screenshots/home.png" alt="Home" width="210" /> |
+| Design spaces for better living | Email or username | Current project, totals and quick tools |
+
+**Bring in a plan**
+
+| Projects | Upload plan | Detected rooms |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/projects.png" alt="Projects" width="210" /> | <img src="docs/screenshots/upload.png" alt="Upload plan" width="210" /> | <img src="docs/screenshots/room-selection.png" alt="Detected rooms" width="210" /> |
+| Search and filter by stage | JPG or PNG, up to 10 MB | Pick a room, see its suitability |
+
+**Design and explore**
+
+| AI layout choices | 3D room viewer | Room details |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/layout-choices.png" alt="AI layout choices" width="210" /> | <img src="docs/screenshots/layout-bedroom.png" alt="3D room viewer with the room's pieces" width="210" /> | <img src="docs/screenshots/room-details.png" alt="Room details tab" width="210" /> |
+| Compare layouts by match | Turn, zoom, pick a piece | Score, status, size, pieces |
 
 </div>
+
+<details>
+<summary><strong>More screens</strong></summary>
+
+<br />
+
+<div align="center">
+
+| Sign up | Forgot password | Reset password |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/sign-up.png" alt="Sign up" width="210" /> | <img src="docs/screenshots/forgot-password.png" alt="Forgot password" width="210" /> | <img src="docs/screenshots/reset-password.png" alt="Reset password" width="210" /> |
+
+| Analysing a plan | Saved designs | Profile |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/processing.png" alt="Analysing a floor plan" width="210" /> | <img src="docs/screenshots/saved-designs.png" alt="Saved designs" width="210" /> | <img src="docs/screenshots/profile.png" alt="Profile" width="210" /> |
+
+| Kitchen in 3D | Dining area in 3D | Manage accounts |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/layout-kitchen.png" alt="Kitchen in 3D" width="210" /> | <img src="docs/screenshots/layout-dining-room.png" alt="Dining area in 3D" width="210" /> | <img src="docs/screenshots/admin-accounts.png" alt="Manage accounts" width="210" /> |
+
+| About | Help and support |
+|:---:|:---:|
+| <img src="docs/screenshots/about.png" alt="About LiviSpace" width="210" /> | <img src="docs/screenshots/help.png" alt="Help and support" width="210" /> |
+
+On a wider screen the room and its details sit side by side.
+
+<img src="docs/screenshots/room-3d-viewer-desktop.png" alt="3D viewer on desktop" width="640" />
+<img src="docs/screenshots/saved-design-details.png" alt="Saved design details on a tablet" width="300" />
+<img src="docs/screenshots/room-selection-list.png" alt="Detected rooms on a wide screen" width="640" />
+
+</div>
+
+</details>
+
+The welcome screen's photo loads from the web, so the screenshot shows its
+offline drawing instead. To regenerate every screenshot from the code (no
+account or network needed), run:
+
+```bash
+flutter test tool/readme_screenshots_test.dart --update-goldens
+```
 
 ## Feature highlights
 
@@ -79,7 +140,7 @@ A few highlights, shown in the dark theme at mobile width.
 ### Personalized layouts
 
 - Explore room-specific recommendations
-- Compare match scores and layout tags
+- Compare match scores and layout tags in a ranked list, then confirm and save one
 - Furnish living rooms, bedrooms, kitchens, bathrooms, and dining areas
 - Confirm a layout and save it as a design
 
@@ -94,7 +155,7 @@ A few highlights, shown in the dark theme at mobile width.
 - See your totals on Home: floor plans uploaded, finished plans, and the last layout score
 - Revisit saved designs from the app or web
 - Turn an interactive room view all the way round (walls, doors and windows follow the camera), zoom in, and reset it to the opening view
-- See a layout's score, whether it is valid, the room's size and every piece in it; pick a piece to see its size, how it was placed and why, and find it outlined in the room (a panel over the room on a phone, beside it on a wider screen)
+- See a layout's score, whether it is valid, the room's size and every piece in it; pick a piece to see its size, how it was placed and why, and find it outlined in the room (Pieces and Room details tabs under the room on a phone, a panel beside it on a wider screen)
 - Export or share a room as a picture (PNG) or as a real-size 3D model (`.glb`, in metres, every piece a named object) that opens in Blender, AR viewers and other 3D tools
 
 </td>
@@ -115,7 +176,8 @@ A few highlights, shown in the dark theme at mobile width.
 
 ### Responsive by design
 
-- Mobile bottom navigation
+- One warm look across every screen: dark by default, a gold accent, Plus Jakarta Sans, pill buttons and cards on a flat surface, with a matching light theme
+- A floating pill navigation bar on mobile, with a gold Upload button
 - Tablet and desktop side navigation
 - Shared design tokens and reusable components
 - Loading, empty, retry, and failure states throughout
@@ -174,10 +236,11 @@ flowchart LR
 | Area | Location | Responsibility |
 | --- | --- | --- |
 | App entry point | [`lib/main.dart`](lib/main.dart) | Flutter bootstrap, Supabase initialization, theme, and navigation |
-| Design system | [`lib/app_theme.dart`](lib/app_theme.dart) | Colors, typography, spacing, radii, shadows, and themes |
+| Design system | [`lib/app_theme.dart`](lib/app_theme.dart) | The warm dark and light palettes, Plus Jakarta Sans type, spacing, radii, and themes |
 | Shared components | [`lib/app_components.dart`](lib/app_components.dart) | Buttons, cards, inputs, logos, and reusable UI |
 | Responsive layout | [`lib/responsive.dart`](lib/responsive.dart) | Mobile, tablet, and desktop breakpoints |
 | Feature screens | [`lib/`](lib/) | Authentication, dashboard, projects, upload, layouts, profile, and admin |
+| Screenshot tool | [`tool/readme_screenshots_test.dart`](tool/readme_screenshots_test.dart) | Renders the README screenshots from the real screens |
 | Plan overlay | [`lib/plan_overlay.dart`](lib/plan_overlay.dart) | The uploaded plan with tappable room outlines drawn over it |
 | Data layer | [`lib/data/`](lib/data/) | Models, repositories, layout services, exports, and Supabase access |
 | Backend schema | [`supabase/migrations/`](supabase/migrations/) | Database tables, functions, and policies |
@@ -290,6 +353,9 @@ Never disable the sign-in check on a deployed service.
 flutter analyze
 flutter test
 ```
+
+After changing a screen, refresh the README screenshots with
+`flutter test tool/readme_screenshots_test.dart --update-goldens`.
 
 The Flutter suite covers authentication, validation, models, services,
 navigation, exports, themes, and responsive screens. The screen tests render
