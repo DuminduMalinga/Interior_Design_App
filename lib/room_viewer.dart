@@ -13,11 +13,15 @@ class Room3DViewerScreen extends StatefulWidget {
   const Room3DViewerScreen({
     required this.room,
     required this.layout,
+    this.floorPlanId,
     super.key,
   });
 
   final _DetectedRoom room;
   final _LayoutOption layout;
+
+  /// The floor plan this room belongs to; with it, the design can be saved.
+  final String? floorPlanId;
 
   @override
   State<Room3DViewerScreen> createState() => _Room3DViewerScreenState();
@@ -163,6 +167,34 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
     }
   }
 
+  bool get _canSave =>
+      widget.floorPlanId != null && widget.layout.analysis != null;
+
+  bool _saving = false;
+
+  /// Keeps this room and layout in the user's saved designs.
+  Future<void> _saveDesign() async {
+    final analysis = widget.layout.analysis;
+    final floorPlanId = widget.floorPlanId;
+    if (_saving || analysis == null || floorPlanId == null) return;
+    setState(() => _saving = true);
+    try {
+      await SavedDesignRepository.instance.save(
+        floorPlanId: floorPlanId,
+        roomId: widget.room.roomId,
+        roomName: widget.room.name,
+        layout: analysis,
+      );
+      _say('Design saved.');
+    } catch (_) {
+      _say('Could not save the design. Try again.');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _goHome() => Navigator.of(context).popUntil((route) => route.isFirst);
+
   Future<void> _export() async {
     final kind = await _chooseKind();
     if (kind == null || !mounted) return;
@@ -292,9 +324,19 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
         Positioned(
           top: AppSpacing.xs,
           left: AppSpacing.md,
-          child: _GlassIconButton(
-            icon: Icons.close_rounded,
-            onTap: () => Navigator.of(context).maybePop(),
+          child: Row(
+            children: [
+              _GlassIconButton(
+                icon: Icons.close_rounded,
+                onTap: () => Navigator.of(context).maybePop(),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              _GlassIconButton(
+                icon: Icons.home_rounded,
+                tooltip: 'Back to home',
+                onTap: _goHome,
+              ),
+            ],
           ),
         ),
         Positioned(
@@ -334,6 +376,8 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
                 accent: roomColor,
                 busy: _exporting,
                 onExport: _export,
+                onSave: _canSave ? _saveDesign : null,
+                saving: _saving,
                 onShare: _share,
                 onDetails: wide || details == null
                     ? null
@@ -487,6 +531,13 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
                           overImage: true,
                           onPressed: () => Navigator.of(context).maybePop(),
                         ),
+                        const SizedBox(width: AppSpacing.sm),
+                        AppRoundButton(
+                          icon: Icons.home_rounded,
+                          tooltip: 'Back to home',
+                          overImage: true,
+                          onPressed: _goHome,
+                        ),
                         const Spacer(),
                         Builder(
                           builder: (context) => AppRoundButton(
@@ -633,6 +684,17 @@ class _Room3DViewerScreenState extends State<Room3DViewerScreen> {
                       onTap: _export,
                     ),
                   ),
+                  if (_canSave) ...[
+                    const SizedBox(width: AppSpacing.sm + 2),
+                    Expanded(
+                      child: _ToolbarAction(
+                        icon: Icons.bookmark_border_rounded,
+                        label: 'Save',
+                        busy: _saving,
+                        onTap: _saveDesign,
+                      ),
+                    ),
+                  ],
                   const SizedBox(width: AppSpacing.sm + 2),
                   Expanded(
                     child: Builder(
@@ -795,6 +857,8 @@ class _ViewerToolbar extends StatelessWidget {
     required this.busy,
     required this.onExport,
     required this.onShare,
+    this.onSave,
+    this.saving = false,
     this.onDetails,
     this.detailsOpen = false,
   });
@@ -811,6 +875,10 @@ class _ViewerToolbar extends StatelessWidget {
   final bool busy;
   final VoidCallback onExport;
 
+  /// Keeps the design in the user's saved designs; null when it can't be.
+  final VoidCallback? onSave;
+  final bool saving;
+
   /// Gets the area of the Share button, which iPad anchors its sheet to.
   final void Function(Rect? origin) onShare;
 
@@ -826,6 +894,17 @@ class _ViewerToolbar extends StatelessWidget {
             onTap: onExport,
           ),
         ),
+        if (onSave != null) ...[
+          const SizedBox(width: AppSpacing.sm + 2),
+          Expanded(
+            child: _ToolbarAction(
+              icon: Icons.bookmark_border_rounded,
+              label: 'Save',
+              busy: saving,
+              onTap: onSave!,
+            ),
+          ),
+        ],
         const SizedBox(width: AppSpacing.sm + 2),
         Expanded(
           child: Builder(

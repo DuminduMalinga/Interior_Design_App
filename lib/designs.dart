@@ -116,7 +116,11 @@ class _DesignsScreenState extends State<DesignsScreen> {
     );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => Room3DViewerScreen(room: room, layout: option),
+        builder: (_) => Room3DViewerScreen(
+          room: room,
+          layout: option,
+          floorPlanId: design.floorPlanId,
+        ),
       ),
     );
   }

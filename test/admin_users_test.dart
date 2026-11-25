@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:interior_design/admin_controls.dart';
 import 'package:interior_design/app_theme.dart';
@@ -163,11 +163,12 @@ void main() {
     });
 
     test('puts admins before customers, keeping each group\'s order', () {
-      expect(
-        names(AdminUserList.apply(all, sort: UserSort.role)),
-        ['Dee Dunn', 'Ada Lovelace', 'bob Brown', 'Cy Young'],
-        reason: 'ties keep the order they came in',
-      );
+      expect(names(AdminUserList.apply(all, sort: UserSort.role)), [
+        'Dee Dunn',
+        'Ada Lovelace',
+        'bob Brown',
+        'Cy Young',
+      ], reason: 'ties keep the order they came in');
     });
 
     test('orders by last sign-in, with never signed in as the oldest', () {

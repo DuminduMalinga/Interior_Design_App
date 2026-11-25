@@ -378,7 +378,11 @@ class _LayoutsScreenState extends State<LayoutsScreen> {
   void _open3D(_LayoutOption layout) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => Room3DViewerScreen(room: widget.room, layout: layout),
+        builder: (_) => Room3DViewerScreen(
+          room: widget.room,
+          layout: layout,
+          floorPlanId: widget.floorPlanId,
+        ),
       ),
     );
   }
